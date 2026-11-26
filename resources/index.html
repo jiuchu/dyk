@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#151311">
   <title>资源库 · 电影书架</title>
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20261127c">
 </head>
 <body id="top">
   <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -77,10 +77,11 @@
       <div>
         <p class="eyebrow"><span></span>RESOURCE COLLECTION</p>
         <h1 id="resource-title">把散落的资源，<br><em>收进同一座书架。</em></h1>
-        <p class="hero-description">收集影片、剧集和网盘链接，按类型整理，随时搜索与编辑。数据默认保存在当前浏览器，也可以导出备份，或从 GoComicMosaic 的公开资源接口导入。</p>
+        <p class="hero-description">收集影片、剧集和网盘链接，按类型整理，随时搜索与编辑。已内置电影书架的经典、在映与免费正片，以及 MovieLens、Wikipedia、randfun 的公开电影资料；数据默认保存在当前浏览器，也可以导出备份，或从 GitHub、GoComicMosaic 的公开数据导入。</p>
         <div class="hero-actions">
           <button class="primary-button" id="add-resource" type="button"><svg class="icon"><use href="#icon-plus"></use></svg>新增资源</button>
-          <button class="secondary-button" id="import-movies" type="button"><svg class="icon"><use href="#icon-film"></use></svg>导入免费正片</button>
+          <button class="secondary-button" id="import-movies" type="button"><svg class="icon"><use href="#icon-film"></use></svg>导入内置资源</button>
+          <button class="secondary-button" id="open-github-import" type="button"><svg class="icon"><use href="#icon-grid"></use></svg>从 GitHub 导入</button>
           <button class="secondary-button" id="open-api-import" type="button"><svg class="icon"><use href="#icon-link"></use></svg>连接 GoComicMosaic</button>
         </div>
       </div>
@@ -116,6 +117,7 @@
           </label>
           <div class="filter-row">
             <label class="select-box"><span class="sr-only">资源类型</span><select id="type-filter"></select></label>
+            <label class="select-box"><span class="sr-only">资源来源</span><select id="source-filter"></select></label>
             <label class="select-box"><span class="sr-only">排序方式</span><select id="sort-select">
               <option value="updated">最近更新</option>
               <option value="created">最近添加</option>
@@ -134,11 +136,12 @@
       </div>
 
       <section id="resource-grid" class="resource-grid" aria-label="资源列表"></section>
+      <div class="load-more-wrap"><button id="load-more" class="secondary-button" type="button" hidden>加载更多</button></div>
 
       <section id="empty-state" class="empty-state" hidden>
         <div class="empty-icon"><svg class="icon"><use href="#icon-grid"></use></svg></div>
         <h2>这一格还没有资源</h2>
-        <p id="empty-message">新增一条资源，或从电影书架导入免费正片。</p>
+        <p id="empty-message">新增一条资源，或从电影书架导入影片。</p>
         <button class="primary-button" id="empty-add" type="button">新增第一条资源</button>
       </section>
     </section>
@@ -234,10 +237,31 @@
     </form>
   </dialog>
 
+  <dialog id="github-dialog" class="api-dialog" aria-labelledby="github-title">
+    <form id="github-form" class="dialog-shell">
+      <button id="github-close" class="dialog-close" type="button" aria-label="关闭 GitHub 导入"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <p class="section-kicker">GITHUB DATA</p>
+      <h2 id="github-title">从 GitHub 导入公开数据</h2>
+      <p>填写 raw JSON / CSV 地址或返回 JSON 的公开接口，也可以直接粘贴 GitHub 文件页链接。页面会读取片名、类型、简介、海报与链接；不会读取或提交账号、Cookie、密码。</p>
+      <label class="field"><span>来源名称</span><input id="github-source" type="text" maxlength="80" value="GitHub 公开数据" required></label>
+      <label class="field"><span>数据地址</span><input id="github-url" type="url" placeholder="https://raw.githubusercontent.com/…/data.json" required></label>
+      <label class="check-field"><input id="github-update" type="checkbox"><span>更新已存在的同来源条目</span></label>
+      <p class="api-hint">支持 JSON 数组、CSV 表格，或包含 resources、items、data、list、results、movies 字段的 JSON 对象。接口需允许当前网页跨域读取（CORS）。</p>
+      <p id="github-status" class="api-status" role="status"></p>
+      <div class="dialog-actions editor-actions">
+        <button id="github-submit" class="primary-button" type="submit">读取并导入</button>
+        <button id="github-cancel" class="secondary-button" type="button">取消</button>
+      </div>
+    </form>
+  </dialog>
+
   <input id="json-file" type="file" accept="application/json,.json" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="../data.js"></script>
-  <script src="app.js?v=20261127a"></script>
+  <script src="../classics.js"></script>
+  <script src="../showing.js"></script>
+  <script src="catalog.js?v=20261127f"></script>
+  <script src="app.js?v=20261127f"></script>
 </body>
 </html>

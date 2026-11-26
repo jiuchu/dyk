@@ -157,6 +157,8 @@ h1 em { color: var(--accent-light); font-style: normal; }
 .resource-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; color: var(--faint); font-size: 9px; }
 .resource-card-meta span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+.load-more-wrap { display: flex; justify-content: center; padding: 38px 0 10px; }
+.load-more-wrap[hidden] { display: none; }
 .empty-state { display: grid; min-height: 330px; padding: 58px 20px; place-items: center; align-content: center; border: 1px dashed var(--line-strong); border-radius: 10px; text-align: center; }
 .empty-icon { display: grid; width: 54px; height: 54px; margin-bottom: 16px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--accent); }
 .empty-state h2 { margin: 0; font-family: var(--serif); font-size: 24px; font-weight: 600; }

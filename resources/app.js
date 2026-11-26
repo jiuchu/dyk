@@ -2,6 +2,7 @@
   "use strict";
 
   const storageKey = "dyk-resource-library-v1";
+  const catalogMigrationKey = "dyk-resource-library-catalog-v4";
   const apiDefault = "https://dm.xueximeng.com/api/resources/public";
   let resources = loadResources();
   let editingId = null;
@@ -11,15 +12,20 @@
   const state = {
     query: "",
     type: "all",
+    source: "all",
     sort: "updated",
-    favoritesOnly: false
+    favoritesOnly: false,
+    limit: 120
   };
+  let renderKey = "";
 
   const elements = {
     grid: document.getElementById("resource-grid"),
+    loadMore: document.getElementById("load-more"),
     search: document.getElementById("search-input"),
     clearSearch: document.getElementById("clear-search"),
     typeFilter: document.getElementById("type-filter"),
+    sourceFilter: document.getElementById("source-filter"),
     sort: document.getElementById("sort-select"),
     favoriteFilter: document.getElementById("favorite-filter"),
     summary: document.getElementById("result-summary"),
@@ -59,6 +65,13 @@
     apiEndpoint: document.getElementById("api-endpoint"),
     apiStatus: document.getElementById("api-status"),
     apiSubmit: document.getElementById("api-submit"),
+    github: document.getElementById("github-dialog"),
+    githubForm: document.getElementById("github-form"),
+    githubSource: document.getElementById("github-source"),
+    githubUrl: document.getElementById("github-url"),
+    githubUpdate: document.getElementById("github-update"),
+    githubStatus: document.getElementById("github-status"),
+    githubSubmit: document.getElementById("github-submit"),
     jsonFile: document.getElementById("json-file"),
     toast: document.getElementById("toast")
   };
@@ -194,18 +207,40 @@
   }
 
   function resourcesFromMovies() {
-    const movies = Array.isArray(window.MOVIES) ? window.MOVIES : [];
-    return movies.map((movie) => normalizeResource({
-      id: `movie-${movie.id}`,
-      title: movie.title,
-      type: movie.category || "电影",
-      description: movie.synopsis,
-      poster: movie.poster ? `../${movie.poster}` : "",
-      source: movie.source,
-      tags: movie.tags,
-      links: movie.watchUrl ? [{ label: movie.watchLabel || "在线观看", url: movie.watchUrl }] : [],
-      origin: "电影书架"
-    })).filter(Boolean);
+    const extra = Array.isArray(window.EXTRA_RESOURCES)
+      ? window.EXTRA_RESOURCES.map((item) => normalizeResource(item, { links: normalizeSimpleLinks(item.links) })).filter(Boolean)
+      : [];
+    const collections = [
+      { items: window.MOVIES, prefix: "movie" },
+      { items: window.CLASSICS, prefix: "classic" },
+      { items: window.SHOWING, prefix: "showing" }
+    ];
+    const movies = collections.flatMap(({ items, prefix }) => {
+      if (!Array.isArray(items)) return [];
+      return items.map((movie) => {
+        const links = [];
+        if (movie.watchUrl) {
+          const watchUrl = movie.watchUrl.startsWith("today/") ? `../${movie.watchUrl}` : movie.watchUrl;
+          links.push({ label: movie.watchLabel || "在线观看", url: watchUrl });
+        }
+        if (movie.secondaryUrl) {
+          links.push({ label: movie.secondaryLabel || "更多信息", url: movie.secondaryUrl });
+        }
+        return normalizeResource({
+          id: `${prefix}-${movie.id}`,
+          title: movie.title,
+          titleEn: movie.originalTitle || movie.titleEn,
+          type: movie.category || "电影",
+          description: movie.synopsis,
+          poster: movie.poster ? `../${movie.poster}` : "",
+          source: movie.source || "电影书架",
+          tags: [...(Array.isArray(movie.tags) ? movie.tags : []), movie.source].filter(Boolean),
+          links: normalizeSimpleLinks(links),
+          origin: "电影书架"
+        });
+      }).filter(Boolean);
+    });
+    return [...extra, ...movies];
   }
 
   function loadResources() {
@@ -214,11 +249,22 @@
       if (raw === null) {
         const seeded = resourcesFromMovies();
         localStorage.setItem(storageKey, JSON.stringify(seeded));
+        localStorage.setItem(catalogMigrationKey, "1");
         return seeded;
       }
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return [];
-      return parsed.map((item) => normalizeResource(item, { links: normalizeSimpleLinks(item.links) })).filter(Boolean);
+      let loaded = parsed.map((item) => normalizeResource(item, { links: normalizeSimpleLinks(item.links) })).filter(Boolean);
+      if (localStorage.getItem(catalogMigrationKey) !== "1") {
+        const byId = new Map(loaded.map((resource) => [resource.id, resource]));
+        for (const resource of resourcesFromMovies()) {
+          if (!byId.has(resource.id)) byId.set(resource.id, resource);
+        }
+        loaded = [...byId.values()];
+        localStorage.setItem(storageKey, JSON.stringify(loaded));
+        localStorage.setItem(catalogMigrationKey, "1");
+      }
+      return loaded;
     } catch {
       return [];
     }
@@ -265,10 +311,20 @@
     elements.typeFilter.value = state.type;
   }
 
+  function renderSourceFilter() {
+    const sources = [...new Set(resources.map((resource) => resource.source).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN"));
+    if (state.source !== "all" && !sources.includes(state.source)) state.source = "all";
+    elements.sourceFilter.innerHTML = `<option value="all">全部来源</option>${sources.map((source) =>
+      `<option value="${escapeHtml(source)}">${escapeHtml(source)}</option>`
+    ).join("")}`;
+    elements.sourceFilter.value = state.source;
+  }
+
   function filteredResources() {
     const query = clean(state.query).toLocaleLowerCase("zh-CN");
     const result = resources.filter((resource) => {
       if (state.type !== "all" && resource.type !== state.type) return false;
+      if (state.source !== "all" && resource.source !== state.source) return false;
       if (state.favoritesOnly && !resource.favorite) return false;
       if (!query) return true;
       const haystack = [
@@ -298,19 +354,26 @@
   }
 
   function render() {
+    const nextRenderKey = `${state.query}\n${state.type}\n${state.source}\n${state.sort}\n${state.favoritesOnly}`;
+    if (nextRenderKey !== renderKey) {
+      state.limit = 120;
+      renderKey = nextRenderKey;
+    }
     renderTypeFilter();
+    renderSourceFilter();
     renderStats();
     const list = filteredResources();
-    elements.summary.textContent = `显示 ${list.length} / ${resources.length} 条资源`;
+    const visible = list.slice(0, state.limit);
+    elements.summary.textContent = `显示 ${visible.length} / ${resources.length} 条资源`;
     elements.clearSearch.hidden = !state.query;
-    elements.reset.hidden = !state.query && state.type === "all" && !state.favoritesOnly;
+    elements.reset.hidden = !state.query && state.type === "all" && state.source === "all" && !state.favoritesOnly;
     elements.favoriteFilter.setAttribute("aria-pressed", String(state.favoritesOnly));
-    elements.grid.innerHTML = list.map((resource) => {
+    elements.grid.innerHTML = visible.map((resource) => {
       const hasPoster = Boolean(resource.poster);
       return `<article class="resource-card">
         <button class="resource-case" type="button" data-open="${escapeHtml(resource.id)}" aria-label="查看《${escapeHtml(resource.title)}》详情">
           <div class="resource-cover">
-            <img src="${escapeHtml(resource.poster)}" alt="《${escapeHtml(resource.title)}》海报" loading="lazy" decoding="async" ${hasPoster ? "" : "hidden"}>
+            ${hasPoster ? `<img src="${escapeHtml(resource.poster)}" alt="《${escapeHtml(resource.title)}》海报" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ""}
             <div class="resource-typographic" ${hasPoster ? "hidden" : ""}>${escapeHtml(resource.title)}</div>
             <span class="resource-spine">${escapeHtml(resource.type)}</span>
             <span class="resource-type">${escapeHtml(resource.type)}</span>
@@ -326,9 +389,11 @@
         </div>
       </article>`;
     }).join("");
+    elements.loadMore.hidden = list.length <= state.limit;
+    elements.loadMore.textContent = `加载更多（还有 ${Math.max(0, list.length - state.limit)} 条）`;
     elements.empty.hidden = list.length !== 0;
     if (!resources.length) {
-      elements.emptyMessage.textContent = "新增一条资源，或从电影书架导入免费正片。";
+      elements.emptyMessage.textContent = "新增一条资源，或从电影书架导入影片。";
     } else if (!list.length) {
       elements.emptyMessage.textContent = "没有符合当前筛选条件的资源，换个关键词或清除筛选试试。";
     }
@@ -488,13 +553,15 @@
     showToast("资源已删除。");
   }
 
-  function mergeResources(incoming) {
+  function mergeResources(incoming, options = {}) {
     const byId = new Map(resources.map((resource) => [resource.id, resource]));
+    const overwrite = options.overwrite !== false;
     let added = 0;
     let updated = 0;
     for (const resource of incoming) {
       const existing = byId.get(resource.id);
       if (existing) {
+        if (!overwrite) continue;
         byId.set(resource.id, { ...resource, createdAt: existing.createdAt || resource.createdAt, updatedAt: new Date().toISOString() });
         updated++;
       } else {
@@ -513,19 +580,19 @@
     const existingIds = new Set(resources.map((resource) => resource.id));
     const fresh = incoming.filter((resource) => !existingIds.has(resource.id));
     if (!fresh.length) {
-      showToast("免费正片已经在资源库里了。");
+      showToast("电影书架影片已经在资源库里了。");
       return;
     }
     resources = [...fresh, ...resources];
     saveResources();
     render();
-    showToast(`已从电影书架导入 ${fresh.length} 部免费正片。`);
+    showToast(`已从电影书架导入 ${fresh.length} 部影片。`);
   }
 
   function extractResourceArray(payload) {
     if (Array.isArray(payload)) return payload;
     if (!payload || typeof payload !== "object") return [];
-    for (const key of ["resources", "items", "data", "list", "results"]) {
+    for (const key of ["resources", "items", "data", "list", "results", "movies"]) {
       if (Array.isArray(payload[key])) return payload[key];
       if (payload[key] && typeof payload[key] === "object") {
         const nested = extractResourceArray(payload[key]);
@@ -556,6 +623,150 @@
       links: normalizeExternalLinks(item.links, base),
       origin: "GoComicMosaic"
     });
+  }
+
+  function genericResource(item, endpoint, sourceName) {
+    if (!item || typeof item !== "object") return null;
+    const base = new URL(endpoint);
+    const title = clean(item.title || item.name || item.Title || item.movie_name || item.film || item["片名"] || item["名称"]);
+    if (!title) return null;
+    const year = (clean(item.year || item.release_year || item.releaseDate || item.release_date || item.Year).match(/\d{4}/) || [""])[0];
+    const rawGenres = item.genres || item.genre || item.categories || item.category || item.type || item["类型"];
+    const genres = (Array.isArray(rawGenres) ? rawGenres : String(rawGenres || "").split(/[,，/|]/))
+      .map((genre) => clean(typeof genre === "object" ? genre?.name : genre))
+      .filter(Boolean);
+    const description = clean(item.overview || item.description || item.plot || item.synopsis || item.intro || item.summary || item["简介"]);
+    let rawPoster = item.poster || item.poster_path || item.cover || item.image || item.img || item["海报"] || "";
+    if (Array.isArray(rawPoster)) rawPoster = rawPoster[0] || "";
+    if (typeof rawPoster === "string" && rawPoster.startsWith("/")) {
+      rawPoster = `https://image.tmdb.org/t/p/w500${rawPoster}`;
+    }
+    const poster = rawPoster ? safeHttpUrl(rawPoster, base) : "";
+    const linkValue = item.watchUrl || item.watch_url || item.url || item.link || item.playUrl || item.play_url || item.links;
+    const links = normalizeExternalLinks(linkValue, base);
+    const id = `gh-${hashText(`${sourceName}\n${title}\n${year}`)}`;
+    return normalizeResource({
+      id,
+      title,
+      titleEn: item.original_title || item.originalTitle || item.title_en || item.titleEn,
+      type: genres[0] || "电影",
+      description,
+      poster,
+      source: sourceName,
+      tags: [...genres, year].filter(Boolean),
+      links,
+      origin: sourceName
+    });
+  }
+
+  function normalizeGithubDataUrl(value) {
+    const url = new URL(value);
+    const parts = url.pathname.split("/").filter(Boolean);
+    if (url.hostname === "github.com" && parts[2] === "blob" && parts.length > 4) {
+      url.hostname = "raw.githubusercontent.com";
+      url.pathname = `/${parts[0]}/${parts[1]}/${parts.slice(3).join("/")}`;
+    }
+    return url.href;
+  }
+
+  function parseCsv(text) {
+    const rows = [];
+    let row = [];
+    let field = "";
+    let quoted = false;
+    for (let index = 0; index < text.length; index += 1) {
+      const character = text[index];
+      if (quoted) {
+        if (character === '"' && text[index + 1] === '"') {
+          field += '"';
+          index += 1;
+        } else if (character === '"') {
+          quoted = false;
+        } else {
+          field += character;
+        }
+      } else if (character === '"') {
+        quoted = true;
+      } else if (character === ",") {
+        row.push(field);
+        field = "";
+      } else if (character === "\n") {
+        row.push(field);
+        rows.push(row);
+        row = [];
+        field = "";
+      } else if (character !== "\r") {
+        field += character;
+      }
+    }
+    if (field || row.length) {
+      row.push(field);
+      rows.push(row);
+    }
+    const headers = (rows.shift() || []).map(clean);
+    return rows.filter((values) => values.some((value) => clean(value))).map((values) =>
+      Object.fromEntries(headers.map((header, index) => [header, values[index] || ""]))
+    );
+  }
+
+  function decodeBase64Utf8(value) {
+    const binary = atob(value);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
+  async function importFromGithub(event) {
+    event.preventDefault();
+    const rawEndpoint = safeHttpUrl(elements.githubUrl.value);
+    const endpoint = rawEndpoint ? normalizeGithubDataUrl(rawEndpoint) : "";
+    const sourceName = clean(elements.githubSource.value) || "GitHub 公开数据";
+    elements.githubStatus.classList.remove("is-error");
+    if (!endpoint) {
+      elements.githubStatus.textContent = "请填写有效的 http 或 https 数据地址。";
+      elements.githubStatus.classList.add("is-error");
+      return;
+    }
+    elements.githubSubmit.disabled = true;
+    elements.githubStatus.textContent = "正在读取 GitHub 公开数据…";
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await fetch(endpoint, {
+        headers: { Accept: "application/json, text/csv, text/plain" },
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`地址返回 HTTP ${response.status}`);
+      const contentType = response.headers.get("content-type") || "";
+      let items;
+      if (contentType.includes("csv") || /\.csv(?:$|\?)/i.test(endpoint)) {
+        items = parseCsv(await response.text());
+      } else {
+        if (!contentType.includes("json")) throw new Error("地址返回的不是 JSON 或 CSV，请使用 raw 文件地址或数据接口。");
+        let payload = await response.json();
+        if (payload?.encoding === "base64" && typeof payload.content === "string") {
+          const decoded = decodeBase64Utf8(payload.content);
+          try {
+            payload = JSON.parse(decoded);
+          } catch {
+            items = parseCsv(decoded);
+          }
+        }
+        if (!items) items = extractResourceArray(payload);
+      }
+      if (!items.length) throw new Error("没有读到可导入的资源数组。");
+      const incoming = items.map((item) => genericResource(item, endpoint, sourceName)).filter(Boolean);
+      if (!incoming.length) throw new Error("返回的数据里没有有效片名。");
+      const result = mergeResources(incoming, { overwrite: elements.githubUpdate.checked });
+      elements.githubStatus.textContent = `导入完成：新增 ${result.added} 条，更新 ${result.updated} 条，跳过 ${incoming.length - result.added - result.updated} 条。`;
+      showToast(`已从 ${sourceName} 导入 ${incoming.length} 条资源。`);
+      setTimeout(() => closeDialog(elements.github), 900);
+    } catch (error) {
+      elements.githubStatus.textContent = error.name === "AbortError" ? "读取超时，请稍后重试。" : error.message;
+      elements.githubStatus.classList.add("is-error");
+    } finally {
+      clearTimeout(timer);
+      elements.githubSubmit.disabled = false;
+    }
   }
 
   async function importFromApi(event) {
@@ -638,6 +849,7 @@
   function resetFilters() {
     state.query = "";
     state.type = "all";
+    state.source = "all";
     state.favoritesOnly = false;
     elements.search.value = "";
     render();
@@ -657,6 +869,10 @@
     state.type = elements.typeFilter.value;
     render();
   });
+  elements.sourceFilter.addEventListener("change", () => {
+    state.source = elements.sourceFilter.value;
+    render();
+  });
   elements.sort.addEventListener("change", () => {
     state.sort = elements.sort.value;
     render();
@@ -666,6 +882,10 @@
     render();
   });
   elements.reset.addEventListener("click", resetFilters);
+  elements.loadMore.addEventListener("click", () => {
+    state.limit += 120;
+    render();
+  });
   document.getElementById("add-resource").addEventListener("click", () => openEditor());
   document.getElementById("empty-add").addEventListener("click", () => openEditor());
   document.getElementById("import-movies").addEventListener("click", importMovies);
@@ -700,6 +920,15 @@
   document.getElementById("api-close").addEventListener("click", () => closeDialog(elements.api));
   document.getElementById("api-cancel").addEventListener("click", () => closeDialog(elements.api));
   elements.apiForm.addEventListener("submit", importFromApi);
+  document.getElementById("open-github-import").addEventListener("click", () => {
+    elements.githubStatus.textContent = "";
+    elements.githubStatus.classList.remove("is-error");
+    elements.github.showModal();
+    syncBodyLock();
+  });
+  document.getElementById("github-close").addEventListener("click", () => closeDialog(elements.github));
+  document.getElementById("github-cancel").addEventListener("click", () => closeDialog(elements.github));
+  elements.githubForm.addEventListener("submit", importFromGithub);
 
   elements.grid.addEventListener("click", (event) => {
     const favorite = event.target.closest("[data-favorite]");
@@ -724,7 +953,7 @@
     elements.detailTypographic.hidden = false;
   });
 
-  for (const dialog of [elements.editor, elements.detail, elements.api]) {
+  for (const dialog of [elements.editor, elements.detail, elements.api, elements.github]) {
     dialog.addEventListener("close", syncBodyLock);
     dialog.addEventListener("click", (event) => {
       if (event.target !== dialog) return;
