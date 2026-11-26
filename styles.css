@@ -1508,6 +1508,38 @@ main,
   padding: 38px 34px 30px;
 }
 
+.dialog-topline {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.dialog-rating {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: -4px;
+  white-space: nowrap;
+}
+
+.dialog-rating[hidden] {
+  display: none;
+}
+
+.dialog-rating strong {
+  color: var(--accent);
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.dialog-rating span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .dialog-source {
   margin: 0 0 10px;
   color: var(--accent);

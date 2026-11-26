@@ -92,6 +92,8 @@
     dialogImage: document.getElementById("dialog-image"),
     dialogTypographic: document.getElementById("dialog-typographic"),
     dialogSource: document.getElementById("dialog-source"),
+    dialogRating: document.getElementById("dialog-rating"),
+    dialogRatingValue: document.getElementById("dialog-rating-value"),
     dialogTitle: document.getElementById("dialog-title"),
     dialogMeta: document.getElementById("dialog-meta"),
     dialogTags: document.getElementById("dialog-tags"),
@@ -107,6 +109,7 @@
   let toastTimer;
   let resizeTimer;
   let activeMovieId = null;
+  let dialogPosterRequest = 0;
   let lastDialogTrigger = null;
   let lastColumns = columnCount();
 
@@ -493,6 +496,7 @@
     if (detail.synopsis) movie.synopsis = detail.synopsis;
     if (detail.director) movie.director = detail.director;
     if (detail.actors?.length) movie.actors = detail.actors;
+    if (Number.isFinite(Number(detail.rating)) && Number(detail.rating) > 0) movie.rating = Number(detail.rating);
   }
 
   function saveDetailCache() {
@@ -514,6 +518,7 @@
       if (activeMovieId === movie.id) {
         elements.dialogSynopsis.textContent = movie.synopsis || "";
         renderCredits(movie);
+        renderDialogRating(movie);
       }
       return;
     }
@@ -542,7 +547,8 @@
       const detail = {
         synopsis: clean(payload?.intro),
         director: namesFrom(payload?.directors).join(" / "),
-        actors: namesFrom(payload?.actors).slice(0, 10)
+        actors: namesFrom(payload?.actors).slice(0, 10),
+        rating: Number(payload?.rating?.value)
       };
       if (!detail.synopsis && !detail.director && !detail.actors.length) return;
       detailCache.set(subjectId, detail);
@@ -551,6 +557,7 @@
       if (activeMovieId === movie.id) {
         elements.dialogSynopsis.textContent = movie.synopsis || "";
         renderCredits(movie);
+        renderDialogRating(movie);
       }
     };
     timer = setTimeout(fail, 7000);
@@ -560,22 +567,57 @@
     document.head.appendChild(script);
   }
 
+  function renderDialogRating(movie) {
+    const rating = Number(movie.rating);
+    const hasRating = Number.isFinite(rating) && rating > 0;
+    elements.dialogRating.hidden = !hasRating;
+    elements.dialogRatingValue.textContent = hasRating ? rating.toFixed(1) : "";
+  }
+
+  function updateDialogPoster(movie) {
+    const request = ++dialogPosterRequest;
+    const hasPoster = Boolean(movie.poster);
+    elements.dialogImage.hidden = !hasPoster;
+    elements.dialogTypographic.hidden = hasPoster;
+    elements.dialogImage.alt = hasPoster ? `《${movie.title}》大图海报` : "";
+    elements.dialogTypographic.innerHTML = hasPoster ? "" : typographicCover(movie);
+    if (!hasPoster) {
+      elements.dialogImage.removeAttribute("src");
+      return;
+    }
+
+    elements.dialogImage.removeAttribute("src");
+    const preview = new Image();
+    const full = new Image();
+    let upgraded = false;
+    preview.onload = () => {
+      if (request !== dialogPosterRequest || upgraded) return;
+      elements.dialogImage.src = preview.src;
+    };
+    full.onload = async () => {
+      try {
+        await full.decode();
+      } catch {}
+      if (request !== dialogPosterRequest) return;
+      upgraded = true;
+      elements.dialogImage.src = full.src;
+    };
+    preview.src = thumbnailFor(movie.poster);
+    full.src = movie.poster;
+  }
+
   function openMovie(id, trigger) {
     const movie = movies.find((item) => item.id === id);
     if (!movie) return;
 
     activeMovieId = id;
     lastDialogTrigger = trigger || document.activeElement;
-    const hasPoster = Boolean(movie.poster);
 
-    elements.dialogImage.hidden = !hasPoster;
-    elements.dialogImage.src = hasPoster ? movie.poster : "";
-    elements.dialogImage.alt = hasPoster ? `《${movie.title}》大图海报` : "";
-    elements.dialogTypographic.hidden = hasPoster;
-    elements.dialogTypographic.innerHTML = hasPoster ? "" : typographicCover(movie);
+    updateDialogPoster(movie);
     elements.dialogSource.textContent = movie.source;
     elements.dialogTitle.textContent = movie.title;
     elements.dialogMeta.textContent = movie.meta;
+    renderDialogRating(movie);
     elements.dialogSynopsis.textContent = movie.synopsis;
     elements.dialogWatch.href = movie.watchUrl;
     elements.dialogWatch.setAttribute("aria-label", `前往${movie.source}${movie.watchLabel || "在线观看"}《${movie.title}》（新窗口打开）`);
