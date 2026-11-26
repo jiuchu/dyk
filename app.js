@@ -9,17 +9,18 @@
   const detailCacheKey = "dyk-detail-cache-v2";
   const detailCache = new Map();
   const detailRequests = new Map();
+  const posterQueue = [];
+  let activePosterLoads = 0;
+  const maxPosterLoads = 6;
   const posterObserver = "IntersectionObserver" in window
     ? new IntersectionObserver((entries, observer) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
-          const image = entry.target;
-          const source = image.dataset.src;
-          if (source) image.src = source;
-          image.removeAttribute("data-src");
-          observer.unobserve(image);
+          posterQueue.push(entry.target);
+          observer.unobserve(entry.target);
         }
-      }, { rootMargin: "800px 0px" })
+        loadNextPosters();
+      }, { rootMargin: "200px 0px" })
     : null;
   try {
     const savedDetails = JSON.parse(localStorage.getItem(detailCacheKey) || "{}");
@@ -284,6 +285,25 @@
     if (!poster) return "";
     const filename = poster.split("/").pop().replace(/\.[^.]+$/, "");
     return `assets/posters/thumbs/${filename}.webp`;
+  }
+
+  function loadNextPosters() {
+    while (activePosterLoads < maxPosterLoads && posterQueue.length) {
+      const image = posterQueue.shift();
+      if (!image.isConnected || !image.dataset.src) continue;
+      const source = image.dataset.src;
+      image.removeAttribute("data-src");
+      activePosterLoads++;
+      image.addEventListener("load", () => {
+        activePosterLoads--;
+        loadNextPosters();
+      }, { once: true });
+      image.addEventListener("error", () => {
+        activePosterLoads--;
+        loadNextPosters();
+      }, { once: true });
+      image.src = source;
+    }
   }
 
   function observePosterImages() {
