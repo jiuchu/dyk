@@ -587,22 +587,15 @@
     }
 
     elements.dialogImage.removeAttribute("src");
-    const preview = new Image();
+    elements.dialogImage.src = thumbnailFor(movie.poster);
     const full = new Image();
-    let upgraded = false;
-    preview.onload = () => {
-      if (request !== dialogPosterRequest || upgraded) return;
-      elements.dialogImage.src = preview.src;
-    };
     full.onload = async () => {
       try {
         await full.decode();
       } catch {}
       if (request !== dialogPosterRequest) return;
-      upgraded = true;
       elements.dialogImage.src = full.src;
     };
-    preview.src = thumbnailFor(movie.poster);
     full.src = movie.poster;
   }
 
