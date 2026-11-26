@@ -3,10 +3,12 @@
 
   const movies = Array.isArray(window.MOVIES) ? window.MOVIES : [];
   const storageKey = "jiudian-guan-favorites-v1";
-  const categoryOrder = ["国产经典", "开放动画"];
+  const categoryOrder = [...new Set(movies.map((movie) => movie.category))];
   const categoryNotes = {
-    "国产经典": "从老胶片到银幕记忆",
-    "开放动画": "开放创作，自由观看与下载"
+    "动作": "追车、搏斗与正邪较量",
+    "喜剧": "让生活笑出声",
+    "剧情": "走进银幕里的真实人生",
+    "动画": "开放创作，自由观看与下载"
   };
 
   const state = {
@@ -84,7 +86,8 @@
       movie.source,
       movie.meta,
       movie.category,
-      ...(movie.tags || [])
+      ...(movie.tags || []),
+      ...(movie.keywords || [])
     ].join(" "));
     return haystack.includes(normalize(state.query));
   }
@@ -146,6 +149,7 @@
           <div class="card-face card-front"${isFlipped ? " inert aria-hidden=\"true\"" : ""}>
             <img src="${escapeHtml(movie.poster)}" alt="《${title}》封面" loading="lazy" decoding="async">
             <span class="source-badge">${escapeHtml(movie.source)}</span>
+            ${movie.featured ? '<span class="hot-badge">热门</span>' : ""}
             <button class="favorite-button${isFavorite ? " is-favorite" : ""}" type="button"
               aria-label="${isFavorite ? "移出" : "加入"}想看：${title}" aria-pressed="${isFavorite}">
               <svg class="icon" aria-hidden="true"><use href="#icon-heart"></use></svg>
@@ -184,6 +188,32 @@
         </div>
         <div class="shelf-plank" aria-hidden="true"></div>
       </div>`).join("");
+  }
+
+  function renderFilters() {
+    const filters = [
+      { id: "all", label: "全部" },
+      ...categoryOrder.map((category) => ({ id: `category:${category}`, label: category })),
+      { id: "favorites", label: "想看" }
+    ];
+
+    elements.filters.innerHTML = filters.map(({ id, label }, index) => `
+      <button class="filter-chip${index === 0 ? " is-active" : ""}" type="button"
+        data-filter="${escapeHtml(id)}" aria-pressed="${index === 0}">
+        ${escapeHtml(label)}<span data-count="${escapeHtml(id)}"></span>
+      </button>`).join("");
+  }
+
+  function updateHero() {
+    const highlighted = [
+      ...movies.filter((movie) => movie.featured),
+      ...movies.filter((movie) => !movie.featured)
+    ].slice(0, 3);
+
+    document.querySelectorAll(".hero-poster img").forEach((image, index) => {
+      const movie = highlighted[index];
+      if (movie) image.src = movie.poster;
+    });
   }
 
   function updateCounts() {
@@ -383,5 +413,8 @@
   });
 
   document.getElementById("total-movies").textContent = movies.length;
+  document.getElementById("total-categories").textContent = categoryOrder.length;
+  updateHero();
+  renderFilters();
   render();
 })();

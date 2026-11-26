@@ -61,23 +61,23 @@
         <h1 id="hero-title">把电影<br><em>放回书架。</em></h1>
         <p class="hero-description">像小时候逛租碟店一样，先看封面，再翻到背面读一段简介。挑中哪一部，就前往原站免费观看。</p>
         <div class="hero-stats" aria-label="片库概况">
-          <div><strong id="total-movies">18</strong><span>部影片</span></div>
+          <div><strong id="total-movies">36</strong><span>部影片</span></div>
           <i></i>
-          <div><strong>2</strong><span>类片架</span></div>
+          <div><strong id="total-categories">4</strong><span>类片架</span></div>
           <i></i>
           <div><strong>0</strong><span>元会员费</span></div>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
         <div class="hero-poster hero-poster-back">
-          <img src="assets/posters/tears-of-steel.webp" alt="">
+          <img src="assets/posters/m1905-1181199.jpg" alt="">
         </div>
         <div class="hero-poster hero-poster-middle">
-          <img src="assets/posters/sintel.webp" alt="">
+          <img src="assets/posters/m1905-355722.jpg" alt="">
         </div>
         <div class="hero-poster hero-poster-front">
-          <img src="assets/posters/spring.webp" alt="">
-          <span>本周上架</span>
+          <img src="assets/posters/m1905-1391225.jpg" alt="">
+          <span>热门片</span>
         </div>
         <div class="hero-art-shadow"></div>
       </div>
@@ -88,15 +88,17 @@
         <label class="search-box" for="search-input">
           <svg class="icon"><use href="#icon-search"></use></svg>
           <span class="sr-only">搜索影片</span>
-          <input id="search-input" type="search" placeholder="搜索片名、简介或标签…" autocomplete="off">
+          <input id="search-input" type="search" placeholder="搜片名、英文名、演员、导演、类型…" autocomplete="off">
           <button id="clear-search" class="clear-search" type="button" aria-label="清空搜索" hidden>
             <svg class="icon"><use href="#icon-close"></use></svg>
           </button>
         </label>
         <nav class="filters" id="filters" aria-label="影片分类">
           <button class="filter-chip is-active" type="button" data-filter="all" aria-pressed="true">全部<span data-count="all"></span></button>
-          <button class="filter-chip" type="button" data-filter="category:国产经典" aria-pressed="false">国产经典<span data-count="category:国产经典"></span></button>
-          <button class="filter-chip" type="button" data-filter="category:开放动画" aria-pressed="false">开放动画<span data-count="category:开放动画"></span></button>
+          <button class="filter-chip" type="button" data-filter="category:动作" aria-pressed="false">动作<span data-count="category:动作"></span></button>
+          <button class="filter-chip" type="button" data-filter="category:喜剧" aria-pressed="false">喜剧<span data-count="category:喜剧"></span></button>
+          <button class="filter-chip" type="button" data-filter="category:剧情" aria-pressed="false">剧情<span data-count="category:剧情"></span></button>
+          <button class="filter-chip" type="button" data-filter="category:动画" aria-pressed="false">动画<span data-count="category:动画"></span></button>
           <button class="filter-chip" type="button" data-filter="favorites" aria-pressed="false">想看<span data-count="favorites"></span></button>
         </nav>
       </div>
