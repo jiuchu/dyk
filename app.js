@@ -14,8 +14,7 @@
   const state = {
     filter: "all",
     query: "",
-    favorites: loadFavorites(),
-    flipped: new Set()
+    favorites: loadFavorites()
   };
 
   const elements = {
@@ -28,11 +27,27 @@
     empty: document.getElementById("empty-state"),
     emptyMessage: document.getElementById("empty-message"),
     emptyReset: document.getElementById("empty-reset"),
-    toast: document.getElementById("toast")
+    toast: document.getElementById("toast"),
+    totalMovies: document.getElementById("total-movies"),
+    totalClassic: document.getElementById("total-classic"),
+    doorCount: document.getElementById("door-count"),
+    dialog: document.getElementById("poster-dialog"),
+    dialogClose: document.getElementById("dialog-close"),
+    dialogImage: document.getElementById("dialog-image"),
+    dialogSource: document.getElementById("dialog-source"),
+    dialogTitle: document.getElementById("dialog-title"),
+    dialogMeta: document.getElementById("dialog-meta"),
+    dialogTags: document.getElementById("dialog-tags"),
+    dialogSynopsis: document.getElementById("dialog-synopsis"),
+    dialogWatch: document.getElementById("dialog-watch"),
+    dialogWatchLabel: document.getElementById("dialog-watch-label"),
+    dialogFavorite: document.getElementById("dialog-favorite")
   };
 
   let toastTimer;
   let resizeTimer;
+  let activeMovieId = null;
+  let lastDialogTrigger = null;
   let lastColumns = columnCount();
 
   function loadFavorites() {
@@ -67,6 +82,16 @@
     return String(value ?? "").toLocaleLowerCase().replace(/\s+/g, "");
   }
 
+  function movieYear(movie) {
+    const match = String(movie.meta || "").match(/\b(?:19|20)\d{2}\b/);
+    return match ? Number(match[0]) : null;
+  }
+
+  function movieEra(movie) {
+    const year = movieYear(movie);
+    return year !== null && year < 2010 ? "classic" : "recent";
+  }
+
   function columnCount() {
     if (window.innerWidth < 520) return 2;
     if (window.innerWidth < 820) return 3;
@@ -77,6 +102,8 @@
 
   function matchesMovie(movie) {
     if (state.filter === "favorites" && !state.favorites.has(movie.id)) return false;
+    if (state.filter === "era:classic" && movieEra(movie) !== "classic") return false;
+    if (state.filter === "era:recent" && movieEra(movie) !== "recent") return false;
     if (state.filter.startsWith("category:") && movie.category !== state.filter.slice(9)) return false;
     if (!state.query) return true;
 
@@ -95,6 +122,7 @@
   function buildGroups(items) {
     if (state.filter === "favorites") {
       return [{
+        key: "favorites",
         title: "我的想看",
         note: `${items.length} 部 · 只保存在这台设备的浏览器里`,
         items
@@ -104,27 +132,46 @@
     if (state.filter.startsWith("category:")) {
       const category = state.filter.slice(9);
       return [{
+        key: state.filter,
         title: category,
         note: categoryNotes[category] || `${items.length} 部`,
         items
       }];
     }
 
+    if (state.filter.startsWith("era:")) {
+      const classic = state.filter === "era:classic";
+      return [{
+        key: state.filter,
+        title: classic ? "经典碟架" : "近作碟架",
+        note: classic ? "2010 年以前的影片" : "2010 年及以后的影片",
+        items
+      }];
+    }
+
     if (state.query) {
       return [{
+        key: "search",
         title: "搜索结果",
         note: `与“${state.query}”相关`,
         items
       }];
     }
 
-    return categoryOrder
-      .map((category) => ({
-        title: category,
-        note: categoryNotes[category],
-        items: items.filter((movie) => movie.category === category)
-      }))
-      .filter((group) => group.items.length);
+    return [
+      {
+        key: "classic",
+        title: "经典碟架",
+        note: "老片重看，每一部都有来处",
+        items: items.filter((movie) => movieEra(movie) === "classic")
+      },
+      {
+        key: "recent",
+        title: "近作碟架",
+        note: "近年的口碑佳片与开放动画",
+        items: items.filter((movie) => movieEra(movie) === "recent")
+      }
+    ].filter((group) => group.items.length);
   }
 
   function chunk(items, size) {
@@ -135,64 +182,48 @@
     return rows;
   }
 
-  function renderMovie(movie) {
+  function renderMovie(movie, index) {
     const isFavorite = state.favorites.has(movie.id);
-    const isFlipped = state.flipped.has(movie.id);
     const title = escapeHtml(movie.title);
-    const tags = (movie.tags || []).map((tag) => `<span class="card-tag">${escapeHtml(tag)}</span>`).join("");
-    const watchUrl = escapeHtml(movie.watchUrl);
-    const watchLabel = escapeHtml(movie.watchLabel || "在线观看");
+    const year = movieYear(movie);
+    const tilt = (((index + movie.title.length) % 5) - 2) * 0.28;
 
     return `
-      <article class="movie-card${isFlipped ? " is-flipped" : ""}" data-id="${escapeHtml(movie.id)}">
-        <div class="card-inner">
-          <div class="card-face card-front"${isFlipped ? " inert aria-hidden=\"true\"" : ""}>
-            <img src="${escapeHtml(movie.poster)}" alt="《${title}》封面" loading="lazy" decoding="async">
-            <span class="source-badge">${escapeHtml(movie.source)}</span>
-            ${movie.featured ? '<span class="hot-badge">热门</span>' : ""}
-            <button class="favorite-button${isFavorite ? " is-favorite" : ""}" type="button"
-              aria-label="${isFavorite ? "移出" : "加入"}想看：${title}" aria-pressed="${isFavorite}">
-              <svg class="icon" aria-hidden="true"><use href="#icon-heart"></use></svg>
-            </button>
-            <button class="flip-trigger" type="button" aria-label="查看《${title}》的剧情简介" aria-expanded="${isFlipped}"></button>
-            <div class="card-caption">
-              <h3>${title}</h3>
-              <p>${escapeHtml(movie.meta)}</p>
-            </div>
-            <span class="flip-hint"><svg class="icon" aria-hidden="true"><use href="#icon-flip"></use></svg>翻面</span>
-          </div>
-          <div class="card-face card-back"${isFlipped ? "" : " inert aria-hidden=\"true\""}>
-            <span class="back-source">${escapeHtml(movie.source)}</span>
+      <article class="movie-card" data-id="${escapeHtml(movie.id)}" style="--tilt:${tilt.toFixed(2)}deg">
+        <button class="case-cover" type="button" data-open-id="${escapeHtml(movie.id)}"
+          aria-label="查看《${title}》的大图与剧情简介">
+          <span class="case-spine"><b>${escapeHtml(movie.source)}</b> · ${escapeHtml(movie.category)}${year ? ` · ${year}` : ""}</span>
+          <img src="${escapeHtml(movie.poster)}" alt="《${title}》封面" loading="lazy" decoding="async">
+          <span class="source-badge">${escapeHtml(movie.source)}</span>
+          ${movie.featured ? '<span class="hot-badge">热门</span>' : ""}
+          <span class="case-caption">
             <h3>${title}</h3>
-            <p class="synopsis">${escapeHtml(movie.synopsis)}</p>
-            <div class="card-tags">${tags}</div>
-            <div class="card-actions">
-              <a class="watch-button" href="${watchUrl}" target="_blank" rel="noopener noreferrer"
-                aria-label="前往${escapeHtml(movie.source)}${watchLabel}《${title}》（新窗口打开）">
-                <svg class="icon" aria-hidden="true"><use href="#icon-play"></use></svg>${watchLabel}
-              </a>
-              <button class="back-return" type="button" aria-label="返回《${title}》封面">
-                <svg class="icon" aria-hidden="true"><use href="#icon-flip"></use></svg>返回封面
-              </button>
-            </div>
-          </div>
-        </div>
+            <p>${escapeHtml(movie.meta)}</p>
+          </span>
+        </button>
+        <button class="favorite-button${isFavorite ? " is-favorite" : ""}" type="button"
+          data-favorite-id="${escapeHtml(movie.id)}"
+          aria-label="${isFavorite ? "移出" : "加入"}想看：${title}" aria-pressed="${isFavorite}">
+          <svg class="icon" aria-hidden="true"><use href="#icon-heart"></use></svg>
+        </button>
       </article>`;
   }
 
-  function renderRows(items, columns) {
-    return chunk(items, columns).map((row) => `
+  function renderRows(items, columns, groupIndex) {
+    return chunk(items, columns).map((row, rowIndex) => `
       <div class="shelf-row">
         <div class="poster-grid" style="--cols:${columns}">
-          ${row.map(renderMovie).join("")}
+          ${row.map((movie, index) => renderMovie(movie, rowIndex * columns + index)).join("")}
         </div>
-        <div class="shelf-plank" aria-hidden="true"></div>
+        <div class="shelf-plank" aria-hidden="true" data-label="${String(groupIndex + 1).padStart(2, "0")}.${String(rowIndex + 1).padStart(2, "0")}"></div>
       </div>`).join("");
   }
 
   function renderFilters() {
     const filters = [
       { id: "all", label: "全部" },
+      { id: "era:classic", label: "经典" },
+      { id: "era:recent", label: "近作" },
       ...categoryOrder.map((category) => ({ id: `category:${category}`, label: category })),
       { id: "favorites", label: "想看" }
     ];
@@ -210,19 +241,21 @@
       ...movies.filter((movie) => !movie.featured)
     ].slice(0, 3);
 
-    document.querySelectorAll(".hero-poster img").forEach((image, index) => {
+    document.querySelectorAll(".hero-case img").forEach((image, index) => {
       const movie = highlighted[index];
       if (movie) image.src = movie.poster;
     });
   }
 
   function updateCounts() {
-    document.querySelector("[data-count=\"all\"]").textContent = movies.length;
+    document.querySelector('[data-count="all"]').textContent = movies.length;
+    document.querySelector('[data-count="era:classic"]').textContent = movies.filter((movie) => movieEra(movie) === "classic").length;
+    document.querySelector('[data-count="era:recent"]').textContent = movies.filter((movie) => movieEra(movie) === "recent").length;
     for (const category of categoryOrder) {
       const counter = document.querySelector(`[data-count="category:${category}"]`);
       if (counter) counter.textContent = movies.filter((movie) => movie.category === category).length;
     }
-    document.querySelector("[data-count=\"favorites\"]").textContent = state.favorites.size;
+    document.querySelector('[data-count="favorites"]').textContent = state.favorites.size;
   }
 
   function updateSummary(total) {
@@ -233,17 +266,18 @@
       elements.summary.textContent = state.filter === "favorites" && !hasSearch
         ? "还没有想看的影片"
         : "没有找到符合条件的影片";
-      return;
-    }
-
-    if (hasSearch) {
+    } else if (hasSearch) {
       elements.summary.textContent = `找到 ${total} 部与“${state.query}”相关的影片`;
     } else if (state.filter === "favorites") {
-      elements.summary.textContent = `我的想看 · ${total} 部 · 点击海报翻面`;
+      elements.summary.textContent = `我的想看 · ${total} 部 · 点击封面看大图`;
+    } else if (state.filter === "era:classic") {
+      elements.summary.textContent = `经典碟架 · ${total} 部 · 点击封面看大图`;
+    } else if (state.filter === "era:recent") {
+      elements.summary.textContent = `近作碟架 · ${total} 部 · 点击封面看大图`;
     } else if (state.filter.startsWith("category:")) {
-      elements.summary.textContent = `${state.filter.slice(9)} · ${total} 部 · 点击海报翻面`;
+      elements.summary.textContent = `${state.filter.slice(9)} · ${total} 部 · 点击封面看大图`;
     } else {
-      elements.summary.textContent = `共 ${total} 部影片 · 点击海报翻面看简介`;
+      elements.summary.textContent = `共 ${total} 部影片 · 点击封面看大图与简介`;
     }
 
     elements.reset.hidden = !hasSearch && !hasFilter;
@@ -269,37 +303,63 @@
       return;
     }
 
-    elements.shelves.innerHTML = groups.map((group) => `
-      <section class="collection" aria-labelledby="collection-${escapeHtml(group.title)}">
+    elements.shelves.innerHTML = groups.map((group, groupIndex) => `
+      <section class="collection" aria-labelledby="collection-${escapeHtml(group.key)}">
         <div class="collection-header">
           <div class="collection-title-wrap">
-            <h2 id="collection-${escapeHtml(group.title)}">${escapeHtml(group.title)}</h2>
+            <h2 id="collection-${escapeHtml(group.key)}">${escapeHtml(group.title)}</h2>
             <p>${escapeHtml(group.note)}</p>
           </div>
           <div class="collection-line"></div>
         </div>
-        ${renderRows(group.items, columns)}
+        ${renderRows(group.items, columns, groupIndex)}
       </section>`).join("");
   }
 
-  function setFlipped(card, flipped) {
-    const id = card.dataset.id;
-    const front = card.querySelector(".card-front");
-    const back = card.querySelector(".card-back");
-    const trigger = card.querySelector(".flip-trigger");
+  function openMovie(id, trigger) {
+    const movie = movies.find((item) => item.id === id);
+    if (!movie) return;
 
-    card.classList.toggle("is-flipped", flipped);
-    trigger.setAttribute("aria-expanded", String(flipped));
-    front.toggleAttribute("inert", flipped);
-    back.toggleAttribute("inert", !flipped);
-    front.setAttribute("aria-hidden", String(flipped));
-    back.setAttribute("aria-hidden", String(!flipped));
+    activeMovieId = id;
+    lastDialogTrigger = trigger || document.activeElement;
 
-    if (flipped) state.flipped.add(id);
-    else state.flipped.delete(id);
+    elements.dialogImage.src = movie.poster;
+    elements.dialogImage.alt = `《${movie.title}》大图海报`;
+    elements.dialogSource.textContent = movie.source;
+    elements.dialogTitle.textContent = movie.title;
+    elements.dialogMeta.textContent = movie.meta;
+    elements.dialogSynopsis.textContent = movie.synopsis;
+    elements.dialogWatch.href = movie.watchUrl;
+    elements.dialogWatch.setAttribute("aria-label", `前往${movie.source}${movie.watchLabel || "在线观看"}《${movie.title}》（新窗口打开）`);
+    elements.dialogWatchLabel.textContent = movie.watchLabel || "在线观看";
+    elements.dialogTags.innerHTML = (movie.tags || []).map((tag) => `<span class="dialog-tag">${escapeHtml(tag)}</span>`).join("");
+    updateDialogFavorite();
 
-    if (flipped) back.querySelector(".back-return").focus({ preventScroll: true });
-    else trigger.focus({ preventScroll: true });
+    if (!elements.dialog.open) elements.dialog.showModal();
+    document.body.classList.add("modal-open");
+  }
+
+  function closeDialog() {
+    if (elements.dialog.open) elements.dialog.close();
+  }
+
+  function updateDialogFavorite() {
+    const movie = movies.find((item) => item.id === activeMovieId);
+    if (!movie) return;
+
+    const favorite = state.favorites.has(movie.id);
+    elements.dialogFavorite.classList.toggle("is-favorite", favorite);
+    elements.dialogFavorite.setAttribute("aria-pressed", String(favorite));
+    elements.dialogFavorite.querySelector("span").textContent = favorite ? "已加入想看" : "加入想看";
+  }
+
+  function updateCardFavorite(card, id, movie) {
+    const favorite = state.favorites.has(id);
+    const button = card.querySelector(".favorite-button");
+    if (!button) return;
+    button.classList.toggle("is-favorite", favorite);
+    button.setAttribute("aria-pressed", String(favorite));
+    button.setAttribute("aria-label", `${favorite ? "移出" : "加入"}想看：${movie.title}`);
   }
 
   function toggleFavorite(card, id) {
@@ -316,22 +376,18 @@
 
     saveFavorites();
     updateCounts();
+    updateDialogFavorite();
 
     if (state.filter === "favorites") {
       render();
-    } else {
-      const button = card.querySelector(".favorite-button");
-      const favorite = state.favorites.has(id);
-      button.classList.toggle("is-favorite", favorite);
-      button.setAttribute("aria-pressed", String(favorite));
-      button.setAttribute("aria-label", `${favorite ? "移出" : "加入"}想看：${movie.title}`);
+    } else if (card) {
+      updateCardFavorite(card, id, movie);
     }
   }
 
   function resetAll() {
     state.filter = "all";
     state.query = "";
-    state.flipped.clear();
     elements.search.value = "";
 
     for (const button of elements.filters.querySelectorAll(".filter-chip")) {
@@ -352,14 +408,12 @@
 
   elements.search.addEventListener("input", () => {
     state.query = elements.search.value.trim();
-    state.flipped.clear();
     render();
   });
 
   elements.clearSearch.addEventListener("click", () => {
     elements.search.value = "";
     state.query = "";
-    state.flipped.clear();
     render();
     elements.search.focus();
   });
@@ -369,8 +423,6 @@
     if (!button) return;
 
     state.filter = button.dataset.filter;
-    state.flipped.clear();
-
     for (const chip of elements.filters.querySelectorAll(".filter-chip")) {
       const active = chip === button;
       chip.classList.toggle("is-active", active);
@@ -381,25 +433,34 @@
   });
 
   elements.shelves.addEventListener("click", (event) => {
-    const favoriteButton = event.target.closest(".favorite-button");
+    const favoriteButton = event.target.closest("[data-favorite-id]");
     if (favoriteButton) {
       const card = favoriteButton.closest(".movie-card");
       toggleFavorite(card, card.dataset.id);
       return;
     }
 
-    const flipButton = event.target.closest(".flip-trigger");
-    if (flipButton) {
-      const card = flipButton.closest(".movie-card");
-      setFlipped(card, !state.flipped.has(card.dataset.id));
-      return;
-    }
+    const openButton = event.target.closest("[data-open-id]");
+    if (openButton) openMovie(openButton.dataset.openId, openButton);
+  });
 
-    const returnButton = event.target.closest(".back-return");
-    if (returnButton) {
-      const card = returnButton.closest(".movie-card");
-      setFlipped(card, false);
+  elements.dialogClose.addEventListener("click", closeDialog);
+  elements.dialog.addEventListener("click", (event) => {
+    if (event.target === elements.dialog) closeDialog();
+  });
+  elements.dialog.addEventListener("close", () => {
+    document.body.classList.remove("modal-open");
+    activeMovieId = null;
+    if (lastDialogTrigger && document.contains(lastDialogTrigger)) {
+      lastDialogTrigger.focus({ preventScroll: true });
     }
+  });
+  elements.dialog.addEventListener("cancel", () => {
+    document.body.classList.remove("modal-open");
+  });
+  elements.dialogFavorite.addEventListener("click", () => {
+    const card = elements.shelves.querySelector(`[data-id="${CSS.escape(activeMovieId || "")}"]`);
+    toggleFavorite(card, activeMovieId);
   });
 
   elements.reset.addEventListener("click", resetAll);
@@ -412,8 +473,9 @@
     }, 140);
   });
 
-  document.getElementById("total-movies").textContent = movies.length;
-  document.getElementById("total-categories").textContent = categoryOrder.length;
+  elements.totalMovies.textContent = movies.length;
+  elements.totalClassic.textContent = movies.filter((movie) => movieEra(movie) === "classic").length;
+  elements.doorCount.textContent = `${movies.length} 部`;
   updateHero();
   renderFilters();
   render();

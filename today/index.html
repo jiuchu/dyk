@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>今日热映 · 电影书架</title>
+<meta name="description" content="院线电影决策看板：把专资办的实售数据、豆瓣评分与短评、IMDb 评分放在同一行里，帮你在买票前判断两小时会不会白花。">
+<style>
+:root{
+  --paper:#f3f1ec; --card:#fffdf8; --ink:#191b1f; --sub:#5f6570; --line:#e2ded6;
+  --navy:#1f4368; --teal:#2f6f6b; --up:#c23a22; --down:#2c7a5b; --amber:#b6801f;
+  --good:#2c7a5b; --mid:#b6801f; --bad:#c23a22; --unknown:#7d8492;
+  --star:#e0a92e;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:14px/1.6 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding:26px 20px 70px}
+
+/* 顶 */
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:6px}
+h1{font-size:26px;margin:0;letter-spacing:.5px;font-weight:700}
+h1 .q{color:var(--navy)}
+.lead{color:var(--sub);margin:6px 0 0;max-width:62ch}
+.stamp{font-size:12px;color:var(--sub);text-align:right;line-height:1.9}
+.stamp b{color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.btn{border:1px solid var(--navy);background:var(--navy);color:#fff;border-radius:6px;
+  padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+.btn:hover{background:#173452}
+.btn.ghost{background:transparent;color:var(--navy)}
+.btn.ghost:hover{background:#e9eef4}
+
+/* 大盘条 */
+.market{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin:18px 0 8px}
+.market div{background:var(--card);padding:12px 14px}
+.market .k{font-size:12px;color:var(--sub)}
+.market .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.market .v small{font-size:12px;font-weight:400;color:var(--sub);margin-left:2px}
+
+/* 表 */
+.sec-h{display:flex;align-items:baseline;gap:10px;margin:26px 0 10px}
+.sec-h h2{font-size:16px;margin:0;font-weight:700}
+.sec-h .n{color:var(--sub);font-size:12px}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th{font-size:12px;color:var(--sub);font-weight:600;text-align:left;padding:9px 10px;background:#f7f4ee;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid #efece6;vertical-align:middle}
+tr.row{cursor:pointer}
+tr.row:hover td{background:#f8f5ee}
+tr.row.open td{background:#f4f0e6}
+.num{font-variant-numeric:tabular-nums;text-align:right}
+th.num{text-align:right}
+.rk{width:30px;color:var(--sub);font-variant-numeric:tabular-nums}
+.nm{font-weight:600;font-size:15px}
+.nm .tag{display:inline-block;font-size:11px;font-weight:400;color:var(--sub);background:#eef0ea;border:1px solid #e0e3da;
+  border-radius:4px;padding:0 6px;margin-left:6px;vertical-align:1px}
+.nm .sub{display:block;font-size:12px;font-weight:400;color:var(--sub);margin-top:2px}
+.score{font-size:19px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.score.s-good{color:var(--good)} .score.s-mid{color:var(--mid)} .score.s-bad{color:var(--bad)} .score.s-none{color:var(--unknown);font-size:13px;font-weight:400}
+.verdict{display:inline-block;font-size:12px;border-radius:4px;padding:2px 8px;white-space:nowrap;font-weight:600}
+.v-good{background:#e4f0ea;color:var(--good)} .v-mid{background:#f6eed9;color:var(--mid)}
+.v-bad{background:#f7e6e1;color:var(--bad)} .v-none{background:#eceef0;color:var(--unknown)}
+.trend-up{color:var(--up)} .trend-dn{color:var(--down)} .trend-flat{color:var(--sub)}
+.bar{height:5px;background:#e8e4db;border-radius:3px;overflow:hidden;min-width:52px}
+.bar i{display:block;height:100%;background:var(--navy);border-radius:3px}
+.dash{color:#b9bec7}
+
+/* 展开 */
+tr.detail>td{background:#faf8f3;padding:0;border-bottom:1px solid var(--line)}
+.dbox{display:grid;grid-template-columns:minmax(260px,1.05fr) minmax(300px,1.5fr) minmax(210px,.85fr);gap:0}
+.dcol{padding:16px 18px;border-right:1px solid var(--line)}
+.dcol:last-child{border-right:0}
+.sess{grid-column:1/-1;border-top:1px solid var(--line);padding:14px 18px 16px}
+.sess .datebar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cin{border-top:1px solid var(--line);margin-top:10px}
+.cin .hd{display:flex;gap:12px;align-items:baseline;padding:8px 2px;cursor:pointer;font-size:13px}
+.cin .hd:hover{background:#f4f1ea}
+.cin .cn{font-weight:600;flex:1 1 220px;min-width:0}
+.cin .cd{color:var(--sub);font-size:12px;white-space:nowrap}
+.cin .cp{font-variant-numeric:tabular-nums;white-space:nowrap}
+.cin .sc{display:none;padding:2px 2px 10px;font-size:12.5px;color:var(--ink)}
+.cin.open .sc{display:block}
+.sess .slot{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:3px 8px;margin:0 6px 6px 0;background:#fff;white-space:nowrap}
+.sess button.slot{font:inherit;font-size:12.5px;color:inherit;cursor:pointer}
+.sess .slot b{font-weight:600;font-variant-numeric:tabular-nums}
+.sess .slot.on{background:#fbf1d6;border-color:#b9975b}
+.seatbox{margin:4px 0 2px}
+.sbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--sub);margin:2px 0 8px}
+.sgrid{overflow-x:auto;padding:2px 0 4px}
+.srow{display:flex;gap:3px;align-items:center;margin-bottom:3px}
+.srl{width:18px;flex:0 0 auto;color:var(--sub);font-size:11px;text-align:right;margin-right:4px;font-variant-numeric:tabular-nums}
+.sq{display:inline-block;width:15px;height:13px;flex:0 0 auto;border-radius:3px;border:1px solid #a9b3a0;background:#fff}
+.sbar .sq{width:13px;height:11px}
+.ssold{background:#9aa0ab;border-color:#878d98}
+.smaint{background:repeating-linear-gradient(45deg,#e6e3db,#e6e3db 3px,#f7f5f0 3px,#f7f5f0 6px);border-color:#dcd8ce}
+.snone{background:transparent;border-color:transparent}
+.slove{width:26px}
+.sbar .slove{width:22px}
+.swhen{margin-left:auto;font-size:11px;white-space:nowrap}
+.sel{font:inherit;font-size:12px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 6px}
+.dcol h3{font-size:12px;color:var(--sub);margin:0 0 9px;font-weight:600;letter-spacing:.4px}
+.dl{display:grid;grid-template-columns:56px 1fr;gap:4px 10px;font-size:13px}
+.dl dt{color:var(--sub)}
+.dl dd{margin:0}
+.intro{font-size:13px;color:#3b4048;margin-top:12px;max-height:132px;overflow:auto;line-height:1.75}
+.cmt{border-left:2px solid var(--line);padding:6px 0 6px 10px;margin-bottom:9px;font-size:13px}
+.cmt .meta{font-size:11px;color:var(--sub);margin-top:3px}
+.cmt .st{font-weight:700;font-variant-numeric:tabular-nums;margin-right:5px}
+.st-5{color:var(--good)}.st-4{color:#4f8a5b}.st-3{color:var(--mid)}.st-2{color:#c1703a}.st-1{color:var(--bad)}
+.mood{display:flex;height:7px;border-radius:4px;overflow:hidden;margin:2px 0 12px;background:#e8e4db}
+.mood i{display:block;height:100%}
+.mood .g{background:var(--good)}.mood .m{background:var(--mid)}.mood .b{background:var(--bad)}
+.moodn{font-size:12px;color:var(--sub);margin-bottom:12px}
+.imdb{font-size:13px}
+.imdb .big{font-size:24px;font-weight:700;color:#a8850a;letter-spacing:-.5px;font-variant-numeric:tabular-nums}
+.imdb .big small{font-size:12px;color:var(--sub);font-weight:400}
+.pill{display:inline-block;font-size:12px;border:1px solid var(--line);background:#fff;border-radius:4px;padding:1px 7px;margin:0 6px 6px 0}
+.loading{color:var(--sub);font-size:13px;padding:14px 0}
+.err{color:var(--bad);font-size:12px}
+.warn{background:#fdf6e6;border:1px solid #f0e2bd;border-radius:8px;padding:10px 14px;font-size:13px;margin:14px 0;color:#6b5417}
+.warn b{color:#4d3c0d}
+
+/* 待映 */
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:13px;min-width:150px}
+.chip b{font-weight:600}
+.chip .m{font-size:11px;color:var(--sub);margin-top:2px}
+.chip .r{float:right;font-weight:700;font-variant-numeric:tabular-nums}
+
+/* 说明 */
+.notes{margin-top:30px;padding-top:16px;border-top:1px solid var(--line);color:var(--sub);font-size:12.5px;line-height:2}
+.notes b{color:var(--ink)}
+.notes code{background:#eceae4;padding:1px 5px;border-radius:3px;font-size:12px}
+@media (max-width:900px){.dbox{grid-template-columns:1fr}.dcol{border-right:0;border-bottom:1px solid var(--line)}}
+.site-switch{max-width:1180px;margin:0 auto;padding:18px 20px 0;display:flex;align-items:center;justify-content:space-between;gap:16px;font-size:12px}
+.site-switch a{display:inline-flex;align-items:center;gap:7px;color:var(--navy);font-weight:700;text-decoration:none}
+.site-switch a:hover{text-decoration:underline}
+.site-switch span{color:var(--sub);letter-spacing:.12em}
+@media(max-width:600px){.site-switch{padding:14px 16px 0}.site-switch span{display:none}}
+</style>
+</head>
+<body>
+<nav class="site-switch" aria-label="电影书架导航">
+  <a href="../">← 电影书架 · 免费片库</a>
+  <span>今日热映</span>
+</nav>
+<div class="wrap">
+
+<header>
+  <div>
+    <h1>今天这片，<span class="q">值不值得你花两小时</span></h1>
+    <p class="lead">只列此刻真在大范围排片的片子。票房和场次来自电影专项资金管委会办公室的实售口径，评分和短评来自豆瓣，进口片再叠一个 IMDb 做对照。</p>
+  </div>
+  <div class="stamp">
+    <div>营业日 <b id="tDay">—</b></div>
+    <div>最后一次更新 <b id="tUpd">—</b></div>
+    <div>排片城市 <select id="citySel" class="sel"></select></div>
+    <div><button class="btn" id="bReload">重新取数</button></div>
+  </div>
+</header>
+
+<div class="market" id="market"></div>
+<div id="banner"></div>
+
+<div class="sec-h">
+  <h2>今日排片与口碑</h2>
+  <span class="n" id="tblNote">按当日票房排序 · 点一行看详情</span>
+</div>
+<table>
+  <thead><tr>
+    <th class="rk">#</th>
+    <th>片名</th>
+    <th class="num">豆瓣</th>
+    <th class="num">评分人数</th>
+    <th class="num">片长</th>
+    <th class="num">当日票房</th>
+    <th>占比</th>
+    <th class="num">场均人次</th>
+    <th class="num">累计</th>
+    <th>现在该不该看</th>
+  </tr></thead>
+  <tbody id="tb"><tr><td colspan="10" class="loading">正在取数…</td></tr></tbody>
+</table>
+
+<div class="sec-h"><h2>接下来会上映的</h2><span class="n">豆瓣的待映榜，多数还没开分</span></div>
+<div class="chips" id="soon"><span class="loading">载入中…</span></div>
+
+<div class="notes">
+  <div><b>票房与场次</b> 中国电影数据信息网（专资办）全国票务系统实售数据。场次是<b>实售场次</b>，不是排片表上的计划场次，所以「场均人次」反映的是真坐进去的人。</div>
+  <div><b>评分与短评</b> 豆瓣。分数是 10 分制。短评取的是<b>最近 20 条</b>「看过」，它是正在看这批人的一种抽样，不代表全部短评，也不按质量排序。</div>
+  <div><b>片长写「待补」</b> 不是这部片没时长，是这一趟没去取。取一次就记在你这台机器上，之后打开同一页不再取；取不到时这一页会自己歇几个钟头再来，免得越敲越紧。所以这几格会一天一天变少。</div>
+  <div><b>IMDb</b> 只对非华语片去取，且要片名在 IMDb 上对得上号才对得上。它对刚上映的进口片未必及时，取到就并列显示，取不到不编数。</div>
+  <div><b>判断口径</b> 评分人数不足 <code>2000</code> 时，分数本身不稳，那一行不给结论只报数字。没分数的那几行印的是豆瓣自己给的话（暂无评分、尚未上映），不替它猜。展映、重映这类合并条目按单片处理会算错，已单独标注。</div>
+  <div><b>黄冈排片</b> 影院、场次、票价和<b>逐座占用</b>都直接画在这一页里，不用登录任何东西；城市在右上角切，默认黄冈。点一家影院出场次，点一场出座位。深灰是已被买走的座，斜纹是这间厅本来就不卖的位置（走道、轮椅席这类），两者不是一回事，所以分开上色。座位那一格右下角写的是取数时刻——它是分钟级的状态，你决定去了就该回页面上重新点一次，别拿十分钟前的那张图做决定。</div>
+  <div><b>这份页面自己不算什么</b> 它不预测口碑走势，也不替你看影评。它只做一件事：把「要花的时间」和「别人看完之后怎么说」摆在你点买票按钮之前。</div>
+</div>
+
+</div>
+
+<script>
+'use strict';
+/* ============ 取数 ============ */
+/* 专资办和排片那一层都不回跨域头，得借一层转发。线上是 proxy.jiuchu.top 上那个 Worker；
+   本机预览时同一批路由由 preview-server.js 提供，所以这里按域名切，不发绝对地址。 */
+const PROXY = /^(127\.0\.0\.1|localhost)$/.test(location.hostname) ? '' : 'https://proxy.jiuchu.top';
+const ZGY_BASE = 'https://www.zgdypw.cn/data/';
+const DB_BASE  = 'https://m.douban.com/rexxar/api/v2';
+const MINI = 2000;                     // 评分人数低于这个数就不下结论
+const MINR = 8;                        // 展开短评至少要这么多条带文字
+
+// 豆瓣的三个榜单都没收录的片子，手工补条目号；键是去掉标点空格的专资办片名。
+// 条目号就是 https://movie.douban.com/subject/<这里>/ 地址里那串数字。
+const SEED_IDS = {
+  '我们仅有一次的人生': '36424371'
+};
+
+const norm = s => String(s || '').replace(/[\u200e\u200f\u202a\u200b\u3000\s]/g, '').replace(/[：:·.。]/g, '').toLowerCase();
+const isShow = s => /展映|艺联|全国.*经典|影展|电影节/.test(String(s));
+
+function jget(url, headers) {
+  return fetch(url, { headers: headers || {}, signal: AbortSignal.timeout(20000) })
+    .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then(t => { try { return JSON.parse(t); } catch (e) { throw new Error('返回的不是 JSON'); } });
+}
+
+/* 豆瓣和 IMDb 都只认 JSONP：浏览器 <script> 会带上本页的 Referer，豆瓣要的就是这个头。 */
+function jsonp(base, params) {
+  return new Promise((resolve, reject) => {
+    const cb = '__jp' + Math.random().toString(36).slice(2, 8);
+    const s = document.createElement('script');
+    let done = false;
+    const settle = fn => a => { if (done) return; done = true; clearTimeout(timer);
+      try { delete window[cb]; } catch (e) {} s.remove(); fn(a); };
+    const ok = settle(resolve), bad = settle(reject);
+    window[cb] = d => ok(d);
+    s.onerror = () => bad(new Error('脚本没加载上'));
+    const timer = setTimeout(() => bad(new Error('超时')), 15000);
+    const q = Object.entries(params).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
+    s.src = base + (base.includes('?') ? '&' : '?') + q + '&callback=' + cb;
+    document.head.appendChild(s);
+  });
+}
+const qp = o => Object.entries(o).map(([k, v]) => k + '=' + encodeURIComponent(v)).join('&');
+
+/* 豆瓣：热映 / 待映 两个榜单，匿名可取，一次给全 ID＋评分＋主创 */
+const dbShowing = () => jsonp(DB_BASE + '/subject_collection/movie_showing/items',
+  { count: 60, for_mobile: 1, ck: 'jq_a' });
+const dbSoon = () => jsonp(DB_BASE + '/subject_collection/movie_soon/items',
+  { count: 30, for_mobile: 1, ck: 'jq_a' });
+/* 豆瓣：单片详情、最近短评 —— 展开时才发 */
+const dbDetail = id => jsonp(`${DB_BASE}/movie/${id}`, { for_mobile: 1, ck: 'jq_a' });
+const dbCmts = id => jsonp(`${DB_BASE}/movie/${id}/interests`,
+  { status: 'done', sort: 'new', count: 20, for_mobile: 1, ck: 'jq_a' });
+
+/* 专资办：没有跨域头，必须借一层转发 */
+const zgy = f => jget(PROXY + '/proxy?url=' + encodeURIComponent(ZGY_BASE + f));
+
+/* 排片与座位：这一层从片单、影院、场次到逐座状态是同一家给的，不要登录态也不收凭证。
+   它不回跨域头，所以和专资办一样走中转，中转那一侧只补一个公开的分站号。
+   坐标只用来算距离，城市是这里写死的，不是按访问者 IP 猜的。 */
+const CITIES = [
+  { name: '黄冈', code: '421100', lat: 30.453, lng: 114.871 },
+  { name: '武汉', code: '420100', lat: 30.517, lng: 114.365 },
+  { name: '鄂州', code: '420700', lat: 30.394, lng: 114.895 },
+  { name: '黄石', code: '420200', lat: 30.200, lng: 114.972 },
+  { name: '孝感', code: '420900', lat: 30.917, lng: 113.955 }
+];
+const CITY_KEY = 'movieboard.city.v1';
+const fxCity = () => CITIES[Math.min(+(localStorage.getItem(CITY_KEY) || 0) || 0, CITIES.length - 1)] || CITIES[0];
+
+const fx = (p, params) => jget(PROXY + '/fx?' + qp(Object.assign({ p }, params)));
+const fxData = r => {
+  if (!r || typeof r !== 'object') throw new Error('没回话');
+  if (r.code !== 0) throw new Error(String(r.error || r.msg || ('code ' + r.code)).slice(0, 70));
+  return r.data || {};
+};
+
+/* 时刻：它给的是毫秒时间戳，按北京切 */
+const hhmm = ms => { const d = new Date(ms + 8 * 3600000);
+  return String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0'); };
+const ymd = d => { const x = new Date(d.getTime() + 8 * 3600000);
+  return x.toISOString().slice(0, 10); };
+
+let fxCache = { code: '', at: 0, list: null };
+async function fxFilms() {
+  const c = fxCity();
+  if (fxCache.code === c.code && fxCache.list && Date.now() - fxCache.at < 6 * 3600e3) return fxCache.list;
+  const d = fxData(await fx('/api/mongo/film_list', { cityCode: c.code, type: 'HotFilm' }));
+  fxCache = { code: c.code, at: Date.now(), list: (d.list || []).map(f => ({
+    id: f.filmId, name: f.name, dur: f.duration, area: f.movieArea })) };
+  return fxCache.list;
+}
+const matchFx = (name, list) => {
+  const n = norm(name);
+  if (!n) return null;
+  return list.find(s => norm(s.name) === n)
+      || list.find(s => norm(s.name).includes(n) || n.includes(norm(s.name)))
+      || null;
+};
+
+async function fxDates(filmId) {
+  const c = fxCity();
+  const d = fxData(await fx('/api/mongo/film_dates', { cityCode: c.code, filmId }));
+  return (d.cinemaDates || []).map(x => x.date);
+}
+async function fxCinemas(filmId, date) {
+  const c = fxCity();
+  const d = fxData(await fx('/api/mongo/film_cinema_list', {
+    cityCode: c.code, regionId: '', cinemaLineId: '', page: 0, keywords: '',
+    latitude: c.lat, longitude: c.lng, date, filmId, tags: '' }));
+  return { total: d.total || 0, list: (d.list || []).map(x => ({
+    id: x.cinemaId, name: x.cinemaName, addr: x.cinemaAddress,
+    dist: x.distanceText, price: x.netPrice, down: x.downPrice })) };
+}
+
+const roomCache = {};
+async function fxRooms(cinemaId, filmId, date) {
+  const key = cinemaId + '|' + filmId + '|' + date;
+  if (roomCache[key]) return roomCache[key];
+  const d = fxData(await fx('/api/mongo/film_rooms', { cinemaId, filmId, date }));
+  const out = (d.rooms || []).map(r => ({
+    sid: r.showId, ts: +r.showTime, open: hhmm(r.showTime), hall: r.hallName,
+    ver: r.showVersionType, lang: r.language, price: r.netPrice, dur: r.duration }))
+    .sort((a, b) => a.ts - b.ts);
+  roomCache[key] = out;
+  return out;
+}
+
+async function fxSeats(showId) {
+  const d = fxData(await fx('/api/mongo/room_seats', { showId }));
+  return { room: d.room || {}, sections: (d.room && d.room.sections) || [], seats: d.seats || [] };
+}
+
+/* IMDb：OMDb 负责把片名换成 tt 号（它有跨域头），实时评分只能从 IMDb 自己的
+   打包接口取，那个接口没有跨域头，只认 <script> 标签式的回调。 */
+function imdbPacked(tt) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    const prev = window.imdb;
+    let done = false;
+    const settle = fn => a => { if (done) return; done = true; clearTimeout(timer);
+      if (prev === undefined) delete window.imdb; else window.imdb = prev;
+      s.remove(); fn(a); };
+    const ok = settle(resolve), bad = settle(reject);
+    window.imdb = { rating: { run: d => ok(d) } };
+    s.onerror = () => bad(new Error('IMDb 没回话'));
+    const timer = setTimeout(() => bad(new Error('超时')), 12000);
+    s.src = 'https://p.media-imdb.com/static-content/documents/v1/title/' + tt +
+            '/ratings%3Fjsonp=imdb.rating.run:imdb.api.title.ratings/data.json';
+    document.head.appendChild(s);
+  });
+}
+
+async function imdbOf(title, year) {
+  if (!title) return null;
+  const o = await jget('https://www.omdbapi.com/?apikey=40700ff1&' + qp({ t: title, y: year || '' }));
+  if (!o || !o.imdbID || o.Response === 'False') return null;
+  let rating = null, votes = null, top = null;
+  if (o.imdbRating && o.imdbRating !== 'N/A') rating = +o.imdbRating;
+  if (o.imdbVotes && o.imdbVotes !== 'N/A') votes = +String(o.imdbVotes).replace(/,/g, '');
+  try {
+    const d = await imdbPacked(o.imdbID);
+    const r = d && d.resource;
+    if (r) { if (r.rating) rating = +r.rating; if (r.ratingCount) votes = +r.ratingCount; if (r.topRank) top = +r.topRank; }
+  } catch (e) { /* packed 取不到就退回 OMDb 的那份 */ }
+  const rt = (o.Ratings || []).find(x => x.Source === 'Rotten Tomatoes');
+  return { tt: o.imdbID, en: o.Title, yr: o.Year, rating, votes, top,
+           metascore: o.Metascore, rt };
+}
+
+/* ============ 展示 ============ */
+const bj = iso => { const d = new Date(new Date(iso).getTime() + 8 * 3600000);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()} ${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
+const wan = v => v >= 10000 ? (v / 10000).toFixed(2) + '<small>亿</small>' : Math.round(v) + '<small>万</small>';
+const cnt = v => v >= 10000 ? (v / 10000).toFixed(1) + '万' : (v == null ? '—' : String(v));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const S = { films: [], db: new Map(), market: null };
+
+/* 片长取一次就存本机，因为这一栏只会给新上的片子带来新请求，老片子不必每次再取一遍。 */
+const DUR_KEY = 'movieboard.dur.v1';
+const durCache = (() => {
+  let m = {};
+  try { m = JSON.parse(localStorage.getItem(DUR_KEY) || '{}') || {}; } catch (e) {}
+  return {
+    get: id => m[id],
+    has: id => m[id] !== undefined,
+    put(id, v) { m[id] = v; try { localStorage.setItem(DUR_KEY, JSON.stringify(m)); } catch (e) {} }
+  };
+})();
+const durHtml = v => v ? v + '<small style="color:var(--sub)"> 分钟</small>' : '<span class="dash">—</span>';
+
+/* 被挡一次之后，紧接着再试只会让那一扇窗关得更久（实测挡过一次以后连隔 6 秒的三发全是同一句拒绝）。
+   所以记下被挡的时刻：这台机器上三小时之内不再自动去取，手动展开仍然试。 */
+const BLOCK_KEY = 'movieboard.detBlock.v1';
+const BLOCK_MS = 3 * 3600 * 1000;
+const detBlocked = () => Date.now() - (+(localStorage.getItem(BLOCK_KEY) || 0)) < BLOCK_MS;
+const markBlocked = () => { try { localStorage.setItem(BLOCK_KEY, String(Date.now())); } catch (e) {} };
+const clearBlocked = () => { try { localStorage.removeItem(BLOCK_KEY); } catch (e) {} };
+
+/* 榜单在没分数时自己会给一句话，这句话照抄，不替它编。 */
+const nrReason = f => (f.db && f.db.null_rating_reason) || '';
+
+function verdict(f) {
+  if (f.show) return ['v-none', '展映合并条目', '不是单片，按单片算会错'];
+  if (!f.id) return ['v-none', '豆瓣没对上号', '这份片单里没有它的豆瓣条目，不给结论'];
+  const r = f.db && f.db.rating;
+  if (!r || !r.value) {
+    const why = nrReason(f);
+    if (why === '尚未上映') return ['v-none', '还没上映', '豆瓣标的就是尚未上映，分不出好坏'];
+    if (why) return ['v-none', why, '看的人太少或片子太新，没有可信分数'];
+    return ['v-none', '豆瓣还没开分', '片太新或看的人太少，没有可信分数'];
+  }
+  const n = r.count;
+  if (n < MINI) return ['v-none', `样本仅 ${n} 人`, '人太少，分数本身不稳，别当依据'];
+  const v = r.value;
+  if (v >= 7.5) return ['v-good', '可以放心去看', `豆瓣 ${v.toFixed(1)} 分、${n} 人评`];
+  if (v >= 6.5) return ['v-good', '大概率不亏', `豆瓣 ${v.toFixed(1)} 分`];
+  if (v >= 5.5) return ['v-mid', '挑着看', `豆瓣 ${v.toFixed(1)} 分，接受不了节奏慢就别去`];
+  if (v >= 4.5) return ['v-mid', '类型片，别指望剧情', `豆瓣 ${v.toFixed(1)} 分`];
+  return ['v-bad', '大概率踩雷', `豆瓣 ${v.toFixed(1)} 分、${n} 人评`];
+}
+
+function renderMarket() {
+  const d = S.market.day, rt = S.market.rt;
+  const perSession = d.session ? (d.audience / d.session) : null;
+  const price = d.audience ? (d.box * 1e4 / d.audience) : null;
+  document.getElementById('market').innerHTML = [
+    ['当日总票房', wan(d.box), ''],
+    ['观影人次', cnt(d.audience), ''],
+    ['实售场次', cnt(d.session), ''],
+    ['营业影院', cnt(d.cinema), ''],
+    ['场均人次', perSession == null ? '—' : perSession.toFixed(2), ''],
+    ['平均票价', price == null ? '—' : price.toFixed(1) + '<small>元</small>', ''],
+    ['此刻累计', rt ? wan(rt.totalBoxoffice) + `<small> · 含服务费 ${rt.totalService}万</small>` : '—', '']
+  ].map(([k, v]) => `<div><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+  document.getElementById('tDay').textContent = S.market.businessDay;
+  document.getElementById('tUpd').textContent = bj(new Date().toISOString());
+}
+
+function renderTable() {
+  const tot = S.market.day.box;
+  document.getElementById('tb').innerHTML = S.films.map((f, i) => {
+    const r = f.db && f.db.rating;
+    const hasR = r && r.value;
+    const cls = !hasR ? 's-none' : r.count < MINI ? 's-none' : r.value >= 6.5 ? 's-good' : r.value >= 5 ? 's-mid' : 's-bad';
+    const [vc, vt] = verdict(f);
+    const ratio = f.day > 0 ? f.total / f.day : null;
+    const trend = ratio == null ? '<span class="dash">—</span>'
+      : ratio <= 1.6 ? '<span class="trend-up">刚开画</span>'
+      : ratio >= 40 ? '<span class="trend-dn">已放很久</span>'
+      : '<span class="trend-flat">放映中</span>';
+    return `<tr class="row" data-i="${i}">
+      <td class="rk">${f.rank}</td>
+      <td class="nm">${esc(f.name)}${f.show ? '<span class="tag">展映</span>' : ''}
+        ${f.info ? `<span class="sub">${esc(f.info)}</span>` : ''}</td>
+      <td class="num"><span class="score ${cls}" data-cell="s" title="${esc(hasR ? '' : nrReason(f))}">${
+        hasR ? r.value.toFixed(1) : f.id ? (nrReason(f) || '未开分') : '未收录'}</span></td>
+      <td class="num">${hasR ? cnt(r.count) : '<span class="dash">—</span>'}</td>
+      <td class="num" data-cell="d">${f.id ? (durCache.has(f.id) ? durHtml(durCache.get(f.id))
+                          : '<span class="dash" title="还没去取，点开这一行就会补上">待补</span>')
+                          : '<span class="dash">—</span>'}</td>
+      <td class="num">${f.day.toFixed(0)}<small style="color:var(--sub)"> 万</small></td>
+      <td><div class="bar"><i style="width:${Math.min(100, f.day / tot * 100).toFixed(1)}%"></i></div>
+        <span style="font-size:11px;color:var(--sub)">${(f.day / tot * 100).toFixed(1)}%</span></td>
+      <td class="num">${f.session ? (f.aud / f.session).toFixed(1) : '—'}</td>
+      <td class="num">${f.total >= 10000 ? (f.total / 1e4).toFixed(2) + '<small style="color:var(--sub)"> 亿</small>' : f.total.toFixed(0) + '<small style="color:var(--sub)"> 万</small>'}<br>${trend}</td>
+      <td><span class="verdict ${vc}" title="${esc(verdict(f)[2])}">${vt}</span></td>
+    </tr><tr class="detail" data-d="${i}" hidden><td colspan="10"></td></tr>`;
+  }).join('');
+  document.querySelectorAll('tr.row').forEach(tr => tr.onclick = () => toggle(+tr.dataset.i, tr));
+}
+
+async function toggle(i, tr) {
+  const drow = document.querySelector(`tr.detail[data-d="${i}"]`);
+  const open = !drow.hidden;
+  document.querySelectorAll('tr.detail').forEach(d => { d.hidden = true; });
+  document.querySelectorAll('tr.row').forEach(r => r.classList.remove('open'));
+  if (open) return;
+  drow.hidden = false; tr.classList.add('open');
+  const f = S.films[i];
+  if (!drow.dataset.loaded) {
+    drow.querySelector('td').innerHTML = '<div class="loading">正在取这部片的详情…</div>';
+    drow.dataset.loaded = '1';
+    drow.querySelector('td').innerHTML = await buildDetail(f);
+    fillSessions(f, drow);          // 排片那一格单独填，取数慢也不挡上面那些
+  }
+}
+
+/* 票房结构：只吃专资办的那一行，不依赖豆瓣，所以没条目号也能给 */
+function boxStruct(f) {
+  const ratio = f.day > 0 ? f.total / f.day : null;
+  return `<h3 style="margin-top:0">票房结构</h3><div class="imdb">
+    <div class="dl"><dt>当日</dt><dd>${f.day.toFixed(1)} 万元</dd>
+      <dt>累计</dt><dd>${f.total >= 10000 ? (f.total / 1e4).toFixed(2) + ' 亿元' : f.total.toFixed(1) + ' 万元'}</dd>
+      <dt>累计/当日</dt><dd>${ratio == null ? '—' : ratio.toFixed(1) + ' 倍'}</dd>
+      <dt>实售场次</dt><dd>${f.session} 场</dd>
+      <dt>观影人次</dt><dd>${f.aud} 人</dd>
+      <dt>场均人次</dt><dd>${f.session ? (f.aud / f.session).toFixed(2) : '—'}</dd>
+      <dt>票价</dt><dd>${f.aud ? (f.day * 1e4 / f.aud).toFixed(1) : '—'} 元</dd></div>
+    <div class="moodn" style="margin-top:8px">累计/当日 在 1.6 倍以内基本是刚开画，数字还在爬；超过 40 倍说明已经放了很久，剩下的多是长尾。</div>
+  </div>`;
+}
+
+/* 排片这一格：日期和影院先给，场次等点开那一家再取，座位等点开那一格再取。
+   座位图就在这格里面——它给的是「这一场此刻还剩哪些位置」，不是画一张好看的厅。 */
+function sessionBlock(f) {
+  return `<div class="sess" data-sess>
+    <h3>${esc(fxCity().name)}排片 · 座位</h3>
+    <div class="sessbody"><span class="moodn" style="margin:0">正在取这一部在${esc(fxCity().name)}的场次…</span></div>
+  </div>`;
+}
+
+/* 它把座位状态写成两个字段：whstate=LK 是这间厅永久不卖的位置（它自己前端标「维护」），
+   status=LK 才是被人买走的。合成一个色，满场和空场就长得一样。 */
+const seatCls = s => s.whstate === 'LK' ? 'smaint' : (s.status === 'LK' ? 'ssold' : 'sfree');
+
+function seatGrid(seats) {
+  let maxR = 0, maxC = 0, minC = 1e9;
+  const at = {};
+  for (const s of seats) {
+    const r = +s.rowNo, c = +s.columnNo;
+    if (!(r > 0) || !(c > 0)) continue;
+    if (r > maxR) maxR = r;
+    if (c > maxC) maxC = c;
+    if (c < minC) minC = c;
+    at[r + ':' + c] = s;
+  }
+  if (!maxR) return '';
+  let out = '';
+  for (let r = 1; r <= maxR; r++) {
+    out += `<div class="srow"><span class="srl">${r}</span>`;
+    for (let c = minC; c <= maxC; c++) {
+      const s = at[r + ':' + c];
+      out += s ? `<span class="sq ${seatCls(s)}${s.lovestatus === 1 ? ' slove' : ''}" title="${esc(s.seatNo)}"></span>`
+                : '<span class="sq snone"></span>';
+    }
+    out += '</div>';
+  }
+  return `<div class="sgrid">${out}</div>`;
+}
+
+function seatPanel(d, r) {
+  let sold = 0, maint = 0, love = 0;
+  for (const s of d.seats) {
+    if (s.whstate === 'LK') maint++;
+    else if (s.status === 'LK') sold++;
+    if (s.lovestatus === 1) love++;
+  }
+  const free = d.seats.length - sold - maint;
+  const pr = [...new Set(d.sections.map(x => x.netPrice).filter(x => x != null))];
+  const hall = String((r && r.hall) || (d.room && d.room.hallName) || '').slice(0, 22);
+  const dur = (r && r.dur) || (d.room && d.room.duration);
+  return `<div class="sbar"><span class="sq sfree"></span>可选 ${free}` +
+    `<span class="sq ssold"></span>已售 ${sold}` +
+    (maint ? `<span class="sq smaint"></span>不卖 ${maint}` : '') +
+    (love ? `<span class="sq slove"></span>情侣座` : '') +
+    ` 共 ${d.seats.length} 座` +
+    (pr.length ? ' · 票价 ' + pr.map(x => '￥' + (+x).toFixed(1)).join(' / ') : '') +
+    ` · ${esc(hall)}${dur ? ' ' + esc(dur) + ' 分钟' : ''}` +
+    ` <span class="swhen">座位状态取于 ${esc(hhmm(Date.now()))}</span></div>` + seatGrid(d.seats);
+}
+
+async function fillSessions(f, drow) {
+  const box = drow.querySelector('[data-sess] .sessbody');
+  if (!box) return;
+  const cn = fxCity().name;
+  let list;
+  try { list = await fxFilms(); }
+  catch (e) { box.innerHTML = `<div class="err">排片那层没答话：${esc(e.message)}。这一格空着是取数没接上，不是这部片没排。</div>`; return; }
+  const m = matchFx(f.name, list);
+  if (!m) { box.innerHTML = `<div class="moodn" style="margin:0">${esc(cn)}的片单（${list.length} 部）里没有这一部——可能刚下映，也可能这一家不卖它。</div>`; return; }
+  const how = norm(m.name) === norm(f.name) ? '' : `（按片名对的，那边叫「${esc(m.name)}」）`;
+
+  let dates = [];
+  try { dates = await fxDates(m.id); } catch (e) { dates = []; }
+  const today = ymd(new Date());
+  if (!dates.length) dates = [today];
+  let date = dates.includes(today) ? today : dates[0];
+
+  const head = document.createElement('div');
+  const body = document.createElement('div');
+  box.innerHTML = '';
+  box.appendChild(head);
+  box.appendChild(body);
+
+  async function load() {
+    body.innerHTML = '<span class="moodn" style="margin:0">取影院…</span>';
+    let cs;
+    try { cs = await fxCinemas(m.id, date); }
+    catch (e) { body.innerHTML = `<div class="err">影院列表没取到：${esc(e.message)}。</div>`; return; }
+    if (!cs.list.length) { body.innerHTML = `<div class="moodn" style="margin:0">${esc(date)} ${esc(cn)}没有一家影院在排它。</div>`; return; }
+    body.innerHTML = `<div class="moodn" style="margin:0 0 6px">${esc(date)} 本市 ${cs.total} 家在映、列最近 ${cs.list.length} 家；` +
+      `点一行出场次，点一场出座位${how}。距离是从${esc(cn)}市中心量的，不是从你家。</div>` +
+      cs.list.map((c, i) => `<div class="cin" data-c="${i}"><div class="hd">` +
+        `<span class="cn">${esc(c.name)}</span>` +
+        `<span class="cd">${esc(c.dist || '—')}</span>` +
+        `<span class="cp">${c.price != null ? '￥' + (+c.price).toFixed(1) + ' 起' : '—'}</span>` +
+        `</div><div class="sc"></div></div>`).join('');
+
+    body.querySelectorAll('.cin').forEach(el => {
+      const cin = cs.list[+el.dataset.c];
+      el.querySelector('.hd').onclick = async () => {
+        el.classList.toggle('open');
+        if (el.dataset.got) return;
+        el.dataset.got = '1';
+        const sc = el.querySelector('.sc');
+        sc.innerHTML = '<span class="moodn" style="margin:0">取场次…</span>';
+        let rows;
+        try { rows = await fxRooms(cin.id, m.id, date); }
+        catch (e) { delete el.dataset.got; sc.innerHTML = `<span class="err">${esc(e.message)}</span>`; return; }
+        if (!rows.length) { sc.innerHTML = '<span class="moodn" style="margin:0">这一家在这一天没排它（当天的表是空的），换一天或换一家。</span>'; return; }
+        sc.innerHTML = rows.map(r =>
+          `<button class="slot se" data-i="${r.sid}" title="${esc(r.hall || '')} ${esc(r.ver || '')}">` +
+          `<b>${esc(r.open)}</b>${r.ver ? ' ' + esc(String(r.ver).slice(0, 8)) : ''}` +
+          (r.price != null ? ` <span class="cd">￥${(+r.price).toFixed(1)}</span>` : '') +
+          `</button>`).join('') + '<div class="seatbox"></div>';
+
+        const sbox = sc.querySelector('.seatbox');
+        sc.querySelectorAll('.se').forEach(b => {
+          b.onclick = async () => {
+            sc.querySelectorAll('.se').forEach(x => x.classList.toggle('on', x === b));
+            if (sbox.dataset.sid === b.dataset.i && sbox.innerHTML) { sbox.innerHTML = ''; sbox.dataset.sid = ''; return; }
+            sbox.dataset.sid = b.dataset.i;
+            sbox.innerHTML = '<span class="moodn" style="margin:0">取座位…</span>';
+            const r = rows.find(x => x.sid === b.dataset.i);
+            try {
+              const d = await fxSeats(b.dataset.i);
+              if (!d.seats.length) { sbox.innerHTML = '<span class="moodn" style="margin:0">这一场没给座位表——不是空场，是它没回这一层。</span>'; return; }
+              sbox.innerHTML = seatPanel(d, r);
+            } catch (e) { sbox.innerHTML = `<span class="err">座位没取到：${esc(e.message)}</span>`; }
+          };
+        });
+      };
+    });
+  }
+
+  function drawDates() {
+    head.innerHTML = `<div class="datebar" style="margin-bottom:8px">` +
+      dates.map(d => `<button class="slot dt${d === date ? ' on' : ''}" data-d="${esc(d)}">` +
+        `${esc(d === today ? '今天' : d.slice(5))}</button>`).join('') + '</div>';
+    head.querySelectorAll('.dt').forEach(b => b.onclick = () => { date = b.dataset.d; drawDates(); load(); });
+  }
+  drawDates();
+  load();
+}
+
+async function buildDetail(f) {
+  if (f.show) return `<div class="dbox"><div class="dcol" style="grid-column:1/-1">
+    <h3>这一行不是单部影片</h3><p style="font-size:13px;color:var(--sub);margin:0">
+    它是「${esc(f.name)}」这类展映的合并条目，一部片子的场次和票房都不在这个数里，所以没有评分、也不参与上面的排序判断。</p></div></div>`;
+
+  if (!f.id) return `<div class="dbox">
+    <div class="dcol" style="grid-column:1/3"><h3>这一行只有票房，没有口碑</h3>
+      <p style="font-size:13px;margin:0 0 12px">豆瓣的热映、待映、热门三张榜里都没有这部片，
+      所以条目号、评分、短评都取不到——不是它没分，是这一环没接上。没有条目信息也没法去 IMDb 对号。</p>
+      <p style="font-size:13px;color:var(--sub);margin:0">知道它的豆瓣地址（形如
+      <code>https://movie.douban.com/subject/xxxxxxxx/</code>）的话，把那串数字加进源码 SEED_IDS 这张表，
+      这一行就补齐了。</p></div>
+    <div class="dcol">${boxStruct(f)}</div>${sessionBlock(f)}</div>`;
+
+  const parts = [];
+  const fails = [];
+  let det = null, cmts = null, imdb = null;
+  try { det = f._det || await dbDetail(f.id); clearBlocked(); }
+  catch (e) { fails.push('豆瓣条目：' + e.message); markBlocked(); }
+  try { cmts = await dbCmts(f.id); } catch (e) { fails.push('豆瓣短评：' + e.message); }
+
+  /* 榜单那一格本来就带着原名、主创、制片国家和类型，详情被挡时这几栏照样填得上；
+     只有片长、上映日、简介必须逐片取详情。 */
+  const L = f.db || {};
+  const li = String(L.info || '').split('/').map(x => x.trim());
+  const names = a => (a || []).map(x => typeof x === 'string' ? x : (x && x.name) || '').filter(Boolean);
+  const orig = (det && det.original_title) || L.original_title || '';
+  const dirs = names(det ? det.directors : L.directors);
+  const stars = names(det ? det.actors : L.actors);
+  const genres = det ? (det.genres || []).join(' / ') : (li[1] || '');
+  const countries = det ? (det.countries || []).join(' / ') : (li[0] || '');
+  const langs = det ? (det.languages || []).join(' / ') : '';
+  const yr = det ? det.year : L.year;
+  const foreign = countries ? !/中国大陆/.test(countries) : true;
+  if (foreign) {
+    try { imdb = await imdbOf(orig || f.name, yr); }
+    catch (e) { fails.push('IMDb：' + e.message); }
+  }
+
+  // 左：条目信息
+  const dur = det && det.durations && det.durations[0] ? det.durations[0] : '';
+  if (det) {                                  // 展开了就顺手把片长落到本机，表上那一格下次不用再取
+    const mm = String(dur).match(/\d+/);
+    if (mm && !durCache.has(f.id)) {
+      durCache.put(f.id, +mm[0]);
+      const tr = document.querySelector(`tr.row[data-i="${S.films.indexOf(f)}"] [data-cell="d"]`);
+      if (tr) tr.innerHTML = durHtml(+mm[0]);
+    }
+  }
+  const cached = durCache.get(f.id);
+  parts.push(`<div class="dcol">
+    <h3>条目</h3>
+    <dl class="dl">
+      <dt>原名</dt><dd>${esc(orig || '—')}</dd>
+      <dt>导演</dt><dd>${esc(dirs.join('、') || '—')}</dd>
+      <dt>主演</dt><dd>${esc(stars.slice(0, 5).join('、') || '—')}</dd>
+      <dt>类型</dt><dd>${esc(genres || '—')}</dd>
+      <dt>制片</dt><dd>${esc(countries || '—')}</dd>
+      <dt>语言</dt><dd>${esc(langs || '—')}</dd>
+      <dt>片长</dt><dd>${esc(dur || (cached ? cached + ' 分钟' : '—'))}</dd>
+      <dt>上映</dt><dd>${esc((det ? det.pubdate : []).join('；') || '—')}</dd>
+    </dl>
+    ${det && det.intro ? `<div class="intro">${esc(det.intro)}</div>` : ''}
+  </div>`);
+
+  // 中：短评
+  let mid = '<div class="dcol"><h3>最近 20 条「看过」</h3>';
+  if (cmts && cmts.interests && cmts.interests.length) {
+    const arr = cmts.interests, txt = arr.filter(x => x.comment && x.comment.trim().length > 4);
+    const g = arr.filter(x => x.rating && x.rating.value >= 4).length;
+    const m = arr.filter(x => x.rating && x.rating.value === 3).length;
+    const b = arr.filter(x => x.rating && x.rating.value <= 2).length;
+    const n = g + m + b;
+    const avg = n ? arr.reduce((s, x) => s + (x.rating ? x.rating.value * 2 : 0), 0) / n : 0;
+    const rObj = (det && det.rating) || (f.db && f.db.rating) || null;
+    const total = rObj && rObj.count ? rObj.count : 0;
+    mid += `<div class="mood"><i class="g" style="width:${n ? g / n * 100 : 0}%"></i><i class="m" style="width:${n ? m / n * 100 : 0}%"></i><i class="b" style="width:${n ? b / n * 100 : 0}%"></i></div>
+      <div class="moodn">推荐 ${g} · 还行 ${m} · 较差 ${b}；${
+        n ? `这 20 条折成十分制约 <b>${avg.toFixed(1)}</b>` : '这 20 条只打了勾，没打分'}${
+        total > MINI ? `，全片累计 ${cnt(total)} 人打分` : ''}。</div>`;
+    if (!txt.length) mid += '<div class="err">这 20 条只打了分，没写字。</div>';
+    else mid += txt.slice(0, MINR).map(x => {
+      const st = x.rating ? x.rating.value : 0;
+      return `<div class="cmt"><span class="st st-${st}">${st * 2}分</span>${esc(x.comment).trim()}
+        <div class="meta">${esc(x.user ? x.user.name : '')}${x.user && x.user.loc && x.user.loc.name ? ' · ' + esc(x.user.loc.name) : ''} · ${esc(x.create_time).slice(0, 16)}</div></div>`;
+    }).join('');
+    mid += `<div class="moodn" style="margin-top:10px">按时间倒序取的最近 20 条，不是按热度排的，也代表不了全部短评。</div>`;
+  } else mid += '<div class="err">短评没取到' + (f.id ? '' : '（缺条目号）') + '。</div>';
+  parts.push(mid + '</div>');
+
+  // 右：IMDb + 票房结构
+  let right = '<div class="dcol"><h3>外部对照</h3><div class="imdb">';
+  if (!foreign) right += '<div class="moodn">华语片，IMDb 上评的人通常很少，这里不取。</div>';
+  else if (imdb && imdb.rating) {
+    right += `<div class="big">${(+imdb.rating).toFixed(1)}<small> / 10 · IMDb</small></div>
+      <div class="moodn">${esc(imdb.en)} (${esc(imdb.yr)}) · ${cnt(imdb.votes)} 人评${
+      imdb.top && imdb.top <= 250 ? ` · IMDb Top 250 第 ${imdb.top} 名` : ''}</div>`;
+    if (imdb.metascore && imdb.metascore !== 'N/A') right += `<div><span class="pill">Metascore ${esc(imdb.metascore)}</span></div>`;
+    if (imdb.rt && imdb.rt.Value) right += `<div><span class="pill">烂番茄 ${esc(imdb.rt.Value)}</span></div>`;
+    right += '<div class="moodn">IMDb 的观众构成和豆瓣差得远，同一部片两边差 1 分以上很常见，看趋势别看差值。</div>';
+  } else if (imdb) right += '<div class="err">在 IMDb 上对到了条目，但那条还没有评分。</div>';
+  else right += '<div class="err">IMDb 这次没取到。</div>';
+
+  right += '</div>' + boxStruct(f) + '</div>';
+  parts.push(right);
+
+  return `<div class="dbox">${parts.join('')}${sessionBlock(f)}</div>` +
+    (fails.length ? `<div style="padding:10px 18px" class="err">这一格里有取数没成功的：${esc(fails.join('；'))}。空着的位置都是真没取到，不是没有。</div>` : '');
+}
+
+/* 片长这一栏榜单里没有，只能逐片取一次详情，顺带把分数刷成最新的那份。
+   豆瓣的详情接口挡的是"一口气发太多"，不是当天总数：实测隔 5 秒连发 6 发全过，
+   连发 8 发就被挡回来。所以这里严格一发一发地取、每发之间歇 5 秒，
+   并且一被挡就整段停下——接着试只会让它挡得更久，剩下的格子下次打开再补。
+   没补上的格子写「待补」，不写破折号——破折号是没这个数，待补是这个数拿得到、这次没去拿。 */
+async function hydrate() {
+  if (detBlocked()) return;                    // 三个钟头前刚被挡过，这一趟不去敲门
+  const need = S.films.filter(f => f.id && !f.show && !durCache.has(f.id));
+  for (const f of need) {
+    const i = S.films.indexOf(f);
+    const tr = document.querySelector(`tr.row[data-i="${i}"]`);
+    if (!tr) continue;
+    if (i) await new Promise(z => setTimeout(z, 5000));
+    try {
+      const d = f._det || await dbDetail(f.id);
+      f._det = d;
+      clearBlocked();
+      const m = String((d.durations || [''])[0]).match(/\d+/);
+      durCache.put(f.id, m ? +m[0] : 0);
+      const dc = tr.querySelector('[data-cell="d"]');
+      if (dc) dc.innerHTML = durHtml(m ? +m[0] : 0);
+      if (!f.info) {   // 靠 SEED_IDS 补上的行没有副标题，从详情里拼一条
+        f.info = [d.year, (d.countries || []).join(' '), (d.genres || []).join(' '),
+                  (d.directors || []).map(x => x.name).join('、')].filter(Boolean).join(' / ');
+        const sub = tr.querySelector('.nm .sub');
+        if (sub) sub.textContent = f.info;
+        else tr.querySelector('.nm').insertAdjacentHTML('beforeend', `<span class="sub">${esc(f.info)}</span>`);
+      }
+      if (d.rating && d.rating.value && f.db && f.db.rating) {
+        f.db.rating = d.rating;
+        const sc = tr.querySelector('[data-cell="s"]');
+        if (sc) { sc.textContent = d.rating.value.toFixed(1);
+          sc.className = 'score ' + (d.rating.count < MINI ? 's-none' : d.rating.value >= 6.5 ? 's-good' : d.rating.value >= 5 ? 's-mid' : 's-bad'); }
+      }
+    } catch (e) { markBlocked(); break; }   // 被挡回来了：这一趟到此为止，记下时刻，三小时内不再自动试
+  }
+}
+
+/* ============ 主流程 ============ */
+async function boot() {
+  document.getElementById('tb').innerHTML = '<tr><td colspan="10" class="loading">正在取数…</td></tr>';
+  const [day, rt, showing, soon] = await Promise.allSettled([
+    zgy('searchDayBoxOffice.json'), zgy('realtimedata.json'), dbShowing(), dbSoon()
+  ]);
+  const bad = [];
+  if (day.status !== 'fulfilled') { document.getElementById('tb').innerHTML =
+    `<tr><td colspan="10" class="err">专资办的今日数据没取到：${esc(day.reason.message)}。这不是片子的问题，是取数这一环断了，稍后重试。</td></tr>`; return; }
+  const D = day.value.data;
+  S.market = { businessDay: D.businessDay, day: {
+    box: D.dayBoxoffice.totalBoxoffice, audience: D.dayBoxoffice.totalAudience,
+    session: D.dayBoxoffice.totalSession, cinema: D.dayBoxoffice.cinemaCount },
+    rt: rt.status === 'fulfilled' ? rt.value : null };
+  if (rt.status !== 'fulfilled') bad.push('此刻累计大盘');
+
+  // 豆瓣榜单合成 ID 表
+  const byName = new Map();
+  for (const list of [showing, soon]) {
+    if (list.status === 'fulfilled' && list.value.subject_collection_items)
+      for (const it of list.value.subject_collection_items) if (!byName.has(norm(it.title))) byName.set(norm(it.title), it);
+  }
+  if (showing.status !== 'fulfilled') bad.push('豆瓣评分榜');
+
+  S.films = D.top10Films.map(f => {
+    const key = norm(f.filmName);
+    const db = byName.get(key) || null;
+    const id = (db && db.id) || SEED_IDS[key] || (SEED_IDS[norm(f.filmName)]);
+    const seedHit = !db && id;
+    return { rank: f.rank, name: f.filmName, show: isShow(f.filmName),
+      day: parseFloat(f.daySales), total: f.filmTotalSales == null ? parseFloat(f.daySales) : f.filmTotalSales,
+      session: f.daySession, aud: f.dayAudience,
+      db: db || (seedHit ? { id, rating: null } : null), id: db ? db.id : (id || null),
+      info: db ? db.card_subtitle : '', dur: '' };
+  });
+  renderMarket(); renderTable(); hydrate();
+
+  document.getElementById('soon').innerHTML = soon.status === 'fulfilled'
+    ? (soon.value.subject_collection_items || []).map(x =>
+      `<div class="chip"><span class="r" style="color:${x.rating && x.rating.value ? 'var(--navy)' : 'var(--unknown)'}">${
+        x.rating && x.rating.value ? x.rating.value.toFixed(1) : (x.null_rating_reason || '未开分')}</span><b>${esc(x.title)}</b>
+        <div class="m">${esc(x.year || '')} ${esc((x.card_subtitle || '').split('/').slice(1, 3).join(' ').trim())}</div>
+        <div class="m">${esc(x.release_date || '') ? '预计 ' + esc(x.release_date) : ''}</div></div>`).join('')
+    : '<span class="err">待映榜这次没取到。</span>';
+
+  if (bad.length) document.getElementById('banner').innerHTML =
+    `<div class="warn"><b>这次有几块没取到：</b>${esc(bad.join('、'))}。表格里的数字是真取到的，缺的那块留空不补。</div>`;
+  else document.getElementById('banner').innerHTML = '';
+}
+
+/* 城市：默认写死黄冈，右上角可切。切一次只重取排片，不动票房和评分那些。 */
+(function citySelect() {
+  const sel = document.getElementById('citySel');
+  sel.innerHTML = CITIES.map((c, i) => `<option value="${i}">${esc(c.name)}</option>`).join('');
+  sel.value = localStorage.getItem(CITY_KEY) || '0';
+  sel.onchange = () => {
+    try { localStorage.setItem(CITY_KEY, sel.value); } catch (e) {}
+    fxCache = { code: '', at: 0, list: null };
+    Object.keys(roomCache).forEach(k => delete roomCache[k]);
+    const cur = document.querySelector('tr.row.open');
+    document.querySelectorAll('tr.detail').forEach(d => {
+      d.dataset.loaded = ''; d.hidden = true; d.querySelector('td').innerHTML = '';
+    });
+    document.querySelectorAll('tr.row').forEach(r => r.classList.remove('open'));
+    if (cur) toggle(+cur.dataset.i, cur);
+  };
+})();
+
+document.getElementById('bReload').onclick = () => boot();
+boot();
+</script>
+</body>
+</html>
