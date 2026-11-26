@@ -257,6 +257,12 @@
       </span>`;
   }
 
+  function thumbnailFor(poster) {
+    if (!poster) return "";
+    const filename = poster.split("/").pop().replace(/\.[^.]+$/, "");
+    return `assets/posters/thumbs/${filename}.webp`;
+  }
+
   function renderMovie(movie, index) {
     const isFavorite = state.favorites.has(movie.id);
     const title = escapeHtml(movie.title);
@@ -270,7 +276,7 @@
           aria-label="查看《${title}》的大图与剧情简介">
           <span class="case-spine"><b>${escapeHtml(movie.source)}</b> · ${escapeHtml(movie.category)}${year ? ` · ${year}` : ""}</span>
           ${hasPoster
-            ? `<img src="${escapeHtml(movie.poster)}" alt="《${title}》封面" loading="lazy" decoding="async">`
+            ? `<img src="${escapeHtml(thumbnailFor(movie.poster))}" alt="《${title}》封面" loading="lazy" decoding="async" fetchpriority="low">`
             : typographicCover(movie)}
           <span class="source-badge">${escapeHtml(movie.collection === "classic" ? "豆瓣 Top250" : movie.collection === "showing" ? "豆瓣热映" : movie.source)}</span>
           ${movie.featured && movie.collection === "free" ? '<span class="hot-badge">热门</span>' : ""}
