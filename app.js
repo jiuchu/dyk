@@ -11,7 +11,7 @@
   const detailRequests = new Map();
   const posterQueue = [];
   let activePosterLoads = 0;
-  const maxPosterLoads = 6;
+  const maxPosterLoads = 4;
   const posterObserver = "IntersectionObserver" in window
     ? new IntersectionObserver((entries, observer) => {
         for (const entry of entries) {
@@ -291,6 +291,7 @@
   }
 
   function loadNextPosters() {
+    if (activeMovieId !== null) return;
     while (activePosterLoads < maxPosterLoads && posterQueue.length) {
       const image = posterQueue.shift();
       if (!image.isConnected || !image.dataset.src) continue;
@@ -589,6 +590,7 @@
     elements.dialogImage.removeAttribute("src");
     elements.dialogImage.src = thumbnailFor(movie.poster);
     const full = new Image();
+    full.fetchPriority = "high";
     full.onload = async () => {
       try {
         await full.decode();
@@ -637,6 +639,8 @@
 
   function closeDialog() {
     if (elements.dialog.open) elements.dialog.close();
+    activeMovieId = null;
+    loadNextPosters();
   }
 
   function updateDialogFavorite() {
@@ -905,6 +909,7 @@
   elements.dialog.addEventListener("close", () => {
     document.body.classList.remove("modal-open");
     activeMovieId = null;
+    loadNextPosters();
     if (lastDialogTrigger && document.contains(lastDialogTrigger)) {
       lastDialogTrigger.focus({ preventScroll: true });
     }
