@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="电影书架：经典老片、近作佳片与今日热映。免费正版片库可看大图与简介，热映影片可查票房、口碑、排片和座位。">
+  <meta name="description" content="电影书架：豆瓣 Top250 经典必看、正在热映与免费正版片库。看大图、简介、评分与排片，挑一部适合自己的电影。">
   <meta name="theme-color" content="#151311">
   <title>电影书架 · 经典与今日热映</title>
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
@@ -52,29 +52,29 @@
       </span>
     </a>
     <nav class="main-nav" aria-label="主导航">
-      <a class="is-active" href="#library">免费片库</a>
+      <a class="is-active" href="#library">电影书架</a>
       <a href="today/">今日热映</a>
       <a href="#about">片源说明</a>
     </nav>
-    <div class="header-note"><span class="status-dot"></span>合法免费 · 无需会员</div>
+    <div class="header-note"><span class="status-dot"></span>经典 · 热映 · 免费正片</div>
   </header>
 
   <main>
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span></span>老片重看，新片先知</p>
+        <p class="eyebrow"><span></span>经典重看，新片先知</p>
         <h1 id="hero-title">好电影，<br><em>值得慢慢翻。</em></h1>
-        <p class="hero-description">一边是随时能免费看的经典与近作，一边是今天影院里正在发生的热门。先看封面，再点开大图和简介，挑一部适合自己的。</p>
+        <p class="hero-description">从豆瓣 Top250 经典必看，到此刻正在热映的新片，再到随时能免费看的正版佳片。先看封面与评分，再点开大图和简介，挑一部适合自己的。</p>
         <div class="hero-actions">
           <a class="primary-button" href="#library">开始翻片<svg class="icon"><use href="#icon-arrow"></use></svg></a>
-          <a class="secondary-button" href="today/">看今天上映<svg class="icon"><use href="#icon-ticket"></use></svg></a>
+          <a class="secondary-button" href="today/">看今日热映<svg class="icon"><use href="#icon-ticket"></use></svg></a>
         </div>
         <div class="hero-stats" aria-label="片库概况">
-          <div><strong id="total-movies">36</strong><span>部免费影片</span></div>
+          <div><strong id="total-classic">250</strong><span>部经典必看</span></div>
           <i></i>
-          <div><strong id="total-classic">—</strong><span>部经典老片</span></div>
+          <div><strong id="total-free">36</strong><span>部免费正片</span></div>
           <i></i>
-          <div><strong>0</strong><span>元会员费</span></div>
+          <div><strong id="total-showing">26</strong><span>部正在热映</span></div>
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
@@ -97,22 +97,31 @@
       </div>
     </section>
 
-    <section class="door-grid" aria-label="两种看电影的方式">
-      <a class="door-card door-library" href="#library">
+    <section class="door-grid" aria-label="三种看电影的方式">
+      <a class="door-card door-classic" href="#library" data-jump-filter="collection:classic">
         <span class="door-number">01</span>
         <div class="door-copy">
-          <p>FREE LIBRARY</p>
-          <h2>免费片库</h2>
-          <span>经典老片与近作佳片，点开看大图，正版免费看。</span>
+          <p>DOUBAN TOP250</p>
+          <h2>经典必看</h2>
+          <span>影史口碑之作，按豆瓣 Top250 榜单慢慢翻。</span>
         </div>
-        <strong class="door-count" id="door-count">36 部</strong>
+        <strong class="door-count" id="door-classic">250 部</strong>
       </a>
-      <a class="door-card door-today" href="today/">
+      <a class="door-card door-today" href="#library" data-jump-filter="collection:showing">
         <span class="door-number">02</span>
         <div class="door-copy">
           <p>IN CINEMA NOW</p>
-          <h2>今日热映</h2>
-          <span>票房、口碑、排片与座位，决定今晚值不值得出门。</span>
+          <h2>正在热映</h2>
+          <span>新片评分与映后口碑，决定今晚值不值得出门。</span>
+        </div>
+        <strong class="door-count" id="door-showing">26 部</strong>
+      </a>
+      <a class="door-card door-library" href="#library" data-jump-filter="collection:free">
+        <span class="door-number">03</span>
+        <div class="door-copy">
+          <p>FREE LIBRARY</p>
+          <h2>免费正片</h2>
+          <span>1905 与 Blender 的合法免费影片，打开就能看。</span>
         </div>
         <span class="door-arrow"><svg class="icon"><use href="#icon-arrow"></use></svg></span>
       </a>
@@ -121,10 +130,10 @@
     <section id="library" class="library" aria-labelledby="library-title">
       <div class="section-heading">
         <div>
-          <p class="section-kicker">THE FREE SHELF</p>
-          <h2 id="library-title">免费片库</h2>
+          <p class="section-kicker">THE MOVIE SHELF</p>
+          <h2 id="library-title">电影书架</h2>
         </div>
-        <p>点击封面看大图与简介；右上角爱心会留在这台设备。</p>
+        <p>经典与在映使用文字封面，避免搬运电影海报；免费正片保留官方封面。点击卡片看大图与条目信息。</p>
       </div>
 
       <div class="browser-panel" aria-label="查找影片">
@@ -159,7 +168,7 @@
       <div class="source-note-icon"><svg class="icon"><use href="#icon-spark"></use></svg></div>
       <div>
         <h2 id="source-note-title">每一部，都有来处</h2>
-        <p>这里不搬运破解资源，只收录免费正版、公版或开放授权影片。影片是否仍可观看，以原站当前状态为准；今日热映页则只做信息与购票决策，不提供盗版片源。</p>
+        <p>经典必看与正在热映的片名、评分和条目信息来自豆瓣，仅作索引导航，不搬运海报或盗版资源；免费正片来自 1905电影网与 Blender 开放电影。影片是否仍可观看，以原站当前状态为准。</p>
       </div>
       <div class="source-links">
         <a href="https://www.1905.com/" target="_blank" rel="noopener noreferrer">1905电影网<svg class="icon"><use href="#icon-arrow"></use></svg></a>
@@ -184,6 +193,7 @@
       </button>
       <div class="dialog-poster">
         <img id="dialog-image" src="" alt="">
+        <div id="dialog-typographic" class="dialog-typographic" hidden></div>
       </div>
       <div class="dialog-info">
         <p id="dialog-source" class="dialog-source"></p>
@@ -195,6 +205,7 @@
           <a id="dialog-watch" class="watch-button" href="#" target="_blank" rel="noopener noreferrer">
             <svg class="icon"><use href="#icon-play"></use></svg><span id="dialog-watch-label">免费观看</span>
           </a>
+          <a id="dialog-secondary" class="secondary-button" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
           <button id="dialog-favorite" class="favorite-action" type="button" aria-pressed="false">
             <svg class="icon"><use href="#icon-heart"></use></svg><span>加入想看</span>
           </button>
@@ -205,6 +216,8 @@
   </dialog>
 
   <script src="data.js"></script>
+  <script src="classics.js"></script>
+  <script src="showing.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

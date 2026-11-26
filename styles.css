@@ -526,7 +526,7 @@ main,
 
 .door-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
   margin: 4px 0 64px;
 }
@@ -559,6 +559,12 @@ main,
 .door-card:hover {
   transform: translateY(-3px);
   border-color: rgba(215, 168, 95, 0.34);
+}
+
+.door-classic {
+  background:
+    linear-gradient(110deg, rgba(146, 111, 74, 0.17), rgba(146, 111, 74, 0.02)),
+    var(--panel);
 }
 
 .door-library {
@@ -947,6 +953,107 @@ main,
 .movie-card:hover .case-cover img {
   transform: scale(1.025);
   filter: brightness(1.05);
+}
+
+.typographic-cover {
+  position: absolute;
+  inset: 0 0 0 22px;
+  display: block;
+  overflow: hidden;
+  padding: 18px 15px;
+  border-radius: 2px;
+  background:
+    radial-gradient(circle at 78% 16%, color-mix(in srgb, var(--cover-light) 72%, transparent), transparent 32%),
+    linear-gradient(150deg, var(--cover-dark), #11100f 78%);
+  color: #fff8ec;
+  text-align: left;
+}
+
+.typographic-cover::after {
+  position: absolute;
+  right: -28px;
+  bottom: 24px;
+  width: 118px;
+  height: 118px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  box-shadow: 0 0 0 12px rgba(255, 255, 255, 0.035), 0 0 0 26px rgba(255, 255, 255, 0.025);
+  content: "";
+}
+
+.type-cover-art {
+  position: absolute;
+  top: 16%;
+  right: -16%;
+  width: 86%;
+  aspect-ratio: 1;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  transform: rotate(24deg);
+  background: linear-gradient(135deg, transparent 42%, rgba(255, 255, 255, 0.14) 43% 44%, transparent 45%);
+}
+
+.type-rank {
+  position: relative;
+  z-index: 1;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+}
+
+.type-title {
+  position: absolute;
+  top: 27%;
+  right: 14px;
+  left: 15px;
+  z-index: 1;
+  display: -webkit-box;
+  overflow: hidden;
+  font-family: var(--serif);
+  font-size: clamp(17px, 1.65vw, 25px);
+  font-weight: 700;
+  line-height: 1.28;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.type-original {
+  position: absolute;
+  top: 54%;
+  right: 15px;
+  left: 15px;
+  z-index: 1;
+  display: -webkit-box;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.66);
+  font-size: 8px;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.type-rating {
+  position: absolute;
+  top: 64%;
+  left: 15px;
+  z-index: 1;
+  display: grid;
+  gap: 1px;
+}
+
+.type-rating b {
+  color: #f1c77f;
+  font-family: var(--serif);
+  font-size: 22px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.type-rating small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 7px;
+  letter-spacing: 0.08em;
 }
 
 .case-spine {
@@ -1352,6 +1459,49 @@ main,
   box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
 }
 
+.dialog-typographic {
+  position: relative;
+  width: min(100%, 340px);
+  overflow: hidden;
+  aspect-ratio: 0.72;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 5px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-typographic .typographic-cover {
+  inset: 0;
+  padding: 30px;
+}
+
+.dialog-typographic .type-rank {
+  font-size: 11px;
+}
+
+.dialog-typographic .type-title {
+  right: 30px;
+  left: 30px;
+  font-size: clamp(30px, 3.2vw, 44px);
+}
+
+.dialog-typographic .type-original {
+  right: 30px;
+  left: 30px;
+  font-size: 11px;
+}
+
+.dialog-typographic .type-rating {
+  left: 30px;
+}
+
+.dialog-typographic .type-rating b {
+  font-size: 34px;
+}
+
+.dialog-typographic .type-rating small {
+  font-size: 9px;
+}
+
 .dialog-info {
   max-height: min(78vh, 720px);
   overflow-y: auto;
@@ -1625,6 +1775,31 @@ main,
 
   .case-cover {
     padding: 5px 5px 5px 19px;
+  }
+
+  .typographic-cover {
+    left: 19px;
+    padding: 13px 10px;
+  }
+
+  .type-title {
+    right: 10px;
+    left: 10px;
+    font-size: 15px;
+  }
+
+  .type-original {
+    right: 10px;
+    left: 10px;
+    font-size: 7px;
+  }
+
+  .type-rating {
+    left: 10px;
+  }
+
+  .type-rating b {
+    font-size: 18px;
   }
 
   .case-spine {

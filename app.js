@@ -1,15 +1,45 @@
 (() => {
   "use strict";
 
-  const movies = Array.isArray(window.MOVIES) ? window.MOVIES : [];
   const storageKey = "jiudian-guan-favorites-v1";
-  const categoryOrder = [...new Set(movies.map((movie) => movie.category))];
+  const showingCacheKey = "dyk-showing-cache-v1";
+  const showingCooldownKey = "dyk-showing-cooldown-v1";
+  const showingTtl = 4 * 60 * 60 * 1000;
+  const showingCooldown = 3 * 60 * 60 * 1000;
+  const categoryOrder = [];
   const categoryNotes = {
     "动作": "追车、搏斗与正邪较量",
     "喜剧": "让生活笑出声",
     "剧情": "走进银幕里的真实人生",
-    "动画": "开放创作，自由观看与下载"
+    "动画": "开放创作，自由观看与下载",
+    "爱情": "银幕里的相遇与错过",
+    "科幻": "从现在走向想象的世界",
+    "悬疑": "线索、反转与真相",
+    "惊悚": "在紧张里屏住呼吸",
+    "犯罪": "游走于规则与边缘",
+    "冒险": "出发，去未知的地方"
   };
+  const collectionOrder = ["showing", "classic", "free"];
+  const collectionTitles = {
+    showing: "正在热映",
+    classic: "经典必看",
+    free: "免费正片"
+  };
+  const collectionNotes = {
+    showing: "新片评分与映后口碑，点开可继续看今日排片",
+    classic: "豆瓣 Top250 · 按榜单顺序排列",
+    free: "1905电影网与 Blender 的合法免费影片"
+  };
+
+  const freeMovies = (Array.isArray(window.MOVIES) ? window.MOVIES : []).map((movie) => ({
+    ...movie,
+    collection: movie.collection || "free"
+  }));
+  const classicMovies = Array.isArray(window.CLASSICS) ? window.CLASSICS : [];
+  let liveShowing = [];
+  let showingStatus = "fallback";
+  let showingRequest = null;
+  let movies = [...freeMovies, ...classicMovies, ...(Array.isArray(window.SHOWING) ? window.SHOWING : [])];
 
   const state = {
     filter: "all",
@@ -28,12 +58,15 @@
     emptyMessage: document.getElementById("empty-message"),
     emptyReset: document.getElementById("empty-reset"),
     toast: document.getElementById("toast"),
-    totalMovies: document.getElementById("total-movies"),
     totalClassic: document.getElementById("total-classic"),
-    doorCount: document.getElementById("door-count"),
+    totalFree: document.getElementById("total-free"),
+    totalShowing: document.getElementById("total-showing"),
+    doorClassic: document.getElementById("door-classic"),
+    doorShowing: document.getElementById("door-showing"),
     dialog: document.getElementById("poster-dialog"),
     dialogClose: document.getElementById("dialog-close"),
     dialogImage: document.getElementById("dialog-image"),
+    dialogTypographic: document.getElementById("dialog-typographic"),
     dialogSource: document.getElementById("dialog-source"),
     dialogTitle: document.getElementById("dialog-title"),
     dialogMeta: document.getElementById("dialog-meta"),
@@ -41,6 +74,7 @@
     dialogSynopsis: document.getElementById("dialog-synopsis"),
     dialogWatch: document.getElementById("dialog-watch"),
     dialogWatchLabel: document.getElementById("dialog-watch-label"),
+    dialogSecondary: document.getElementById("dialog-secondary"),
     dialogFavorite: document.getElementById("dialog-favorite")
   };
 
@@ -50,22 +84,8 @@
   let lastDialogTrigger = null;
   let lastColumns = columnCount();
 
-  function loadFavorites() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
-      const validIds = new Set(movies.map((movie) => movie.id));
-      return new Set(Array.isArray(saved) ? saved.filter((id) => validIds.has(id)) : []);
-    } catch {
-      return new Set();
-    }
-  }
-
-  function saveFavorites() {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify([...state.favorites]));
-    } catch {
-      showToast("浏览器未允许保存，本次想看标记只在当前页面有效");
-    }
+  function clean(value) {
+    return String(value ?? "").replace(/\s+/g, " ").trim();
   }
 
   function escapeHtml(value) {
@@ -88,8 +108,8 @@
   }
 
   function movieEra(movie) {
-    const year = movieYear(movie);
-    return year !== null && year < 2010 ? "classic" : "recent";
+    const year = Number(movie.year || movieYear(movie));
+    return Number.isFinite(year) && year < 2010 ? "classic" : "recent";
   }
 
   function columnCount() {
@@ -100,8 +120,27 @@
     return 6;
   }
 
+  function loadFavorites() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || "[]");
+      const validIds = new Set(movies.map((movie) => movie.id));
+      return new Set(Array.isArray(saved) ? saved.filter((id) => validIds.has(id)) : []);
+    } catch {
+      return new Set();
+    }
+  }
+
+  function saveFavorites() {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...state.favorites]));
+    } catch {
+      showToast("浏览器未允许保存，本次想看标记只在当前页面有效");
+    }
+  }
+
   function matchesMovie(movie) {
     if (state.filter === "favorites" && !state.favorites.has(movie.id)) return false;
+    if (state.filter.startsWith("collection:") && movie.collection !== state.filter.slice(11)) return false;
     if (state.filter === "era:classic" && movieEra(movie) !== "classic") return false;
     if (state.filter === "era:recent" && movieEra(movie) !== "recent") return false;
     if (state.filter.startsWith("category:") && movie.category !== state.filter.slice(9)) return false;
@@ -109,10 +148,13 @@
 
     const haystack = normalize([
       movie.title,
+      movie.originalTitle,
       movie.synopsis,
       movie.source,
       movie.meta,
       movie.category,
+      movie.director,
+      ...(movie.actors || []),
       ...(movie.tags || []),
       ...(movie.keywords || [])
     ].join(" "));
@@ -125,6 +167,16 @@
         key: "favorites",
         title: "我的想看",
         note: `${items.length} 部 · 只保存在这台设备的浏览器里`,
+        items
+      }];
+    }
+
+    if (state.filter.startsWith("collection:")) {
+      const collection = state.filter.slice(11);
+      return [{
+        key: state.filter,
+        title: collectionTitles[collection] || "影片",
+        note: collectionNotes[collection] || `${items.length} 部`,
         items
       }];
     }
@@ -158,20 +210,12 @@
       }];
     }
 
-    return [
-      {
-        key: "classic",
-        title: "经典碟架",
-        note: "老片重看，每一部都有来处",
-        items: items.filter((movie) => movieEra(movie) === "classic")
-      },
-      {
-        key: "recent",
-        title: "近作碟架",
-        note: "近年的口碑佳片与开放动画",
-        items: items.filter((movie) => movieEra(movie) === "recent")
-      }
-    ].filter((group) => group.items.length);
+    return collectionOrder.map((collection) => ({
+      key: collection,
+      title: collectionTitles[collection],
+      note: collectionNotes[collection],
+      items: items.filter((movie) => movie.collection === collection)
+    })).filter((group) => group.items.length);
   }
 
   function chunk(items, size) {
@@ -182,20 +226,52 @@
     return rows;
   }
 
+  function coverPalette(movie) {
+    const palettes = [
+      ["#59362c", "#c78458"],
+      ["#253e4a", "#7fb0b5"],
+      ["#44364f", "#b38bc0"],
+      ["#3f472b", "#a9b779"],
+      ["#4d342b", "#d5a06a"],
+      ["#29374e", "#829dcc"]
+    ];
+    let hash = 0;
+    for (const character of `${movie.id}${movie.title}`) hash = (hash * 31 + character.codePointAt(0)) >>> 0;
+    return palettes[hash % palettes.length];
+  }
+
+  function typographicCover(movie) {
+    const [dark, light] = coverPalette(movie);
+    const rankLabel = movie.collection === "classic" && movie.rank ? `NO.${String(movie.rank).padStart(3, "0")}` : "";
+    const rating = Number(movie.rating);
+    const ratingLabel = Number.isFinite(rating) && rating > 0 ? rating.toFixed(1) : "暂无评分";
+    return `
+      <span class="typographic-cover" style="--cover-dark:${dark};--cover-light:${light}">
+        <span class="type-cover-art" aria-hidden="true"></span>
+        ${rankLabel ? `<span class="type-rank">${escapeHtml(rankLabel)}</span>` : ""}
+        <span class="type-title">${escapeHtml(movie.title)}</span>
+        <span class="type-original">${escapeHtml(movie.originalTitle || "")}</span>
+        <span class="type-rating"><b>${escapeHtml(ratingLabel)}</b><small>豆瓣评分</small></span>
+      </span>`;
+  }
+
   function renderMovie(movie, index) {
     const isFavorite = state.favorites.has(movie.id);
     const title = escapeHtml(movie.title);
     const year = movieYear(movie);
     const tilt = (((index + movie.title.length) % 5) - 2) * 0.28;
+    const hasPoster = Boolean(movie.poster);
 
     return `
-      <article class="movie-card" data-id="${escapeHtml(movie.id)}" style="--tilt:${tilt.toFixed(2)}deg">
+      <article class="movie-card${hasPoster ? "" : " is-typographic"}" data-id="${escapeHtml(movie.id)}" style="--tilt:${tilt.toFixed(2)}deg">
         <button class="case-cover" type="button" data-open-id="${escapeHtml(movie.id)}"
           aria-label="查看《${title}》的大图与剧情简介">
           <span class="case-spine"><b>${escapeHtml(movie.source)}</b> · ${escapeHtml(movie.category)}${year ? ` · ${year}` : ""}</span>
-          <img src="${escapeHtml(movie.poster)}" alt="《${title}》封面" loading="lazy" decoding="async">
-          <span class="source-badge">${escapeHtml(movie.source)}</span>
-          ${movie.featured ? '<span class="hot-badge">热门</span>' : ""}
+          ${hasPoster
+            ? `<img src="${escapeHtml(movie.poster)}" alt="《${title}》封面" loading="lazy" decoding="async">`
+            : typographicCover(movie)}
+          <span class="source-badge">${escapeHtml(movie.collection === "classic" ? "豆瓣 Top250" : movie.collection === "showing" ? "豆瓣热映" : movie.source)}</span>
+          ${movie.featured && movie.collection === "free" ? '<span class="hot-badge">热门</span>' : ""}
           <span class="case-caption">
             <h3>${title}</h3>
             <p>${escapeHtml(movie.meta)}</p>
@@ -222,23 +298,24 @@
   function renderFilters() {
     const filters = [
       { id: "all", label: "全部" },
-      { id: "era:classic", label: "经典" },
-      { id: "era:recent", label: "近作" },
+      { id: "collection:showing", label: "正在热映" },
+      { id: "collection:classic", label: "经典必看" },
+      { id: "collection:free", label: "免费正片" },
       ...categoryOrder.map((category) => ({ id: `category:${category}`, label: category })),
       { id: "favorites", label: "想看" }
     ];
 
-    elements.filters.innerHTML = filters.map(({ id, label }, index) => `
-      <button class="filter-chip${index === 0 ? " is-active" : ""}" type="button"
-        data-filter="${escapeHtml(id)}" aria-pressed="${index === 0}">
+    elements.filters.innerHTML = filters.map(({ id, label }) => `
+      <button class="filter-chip${id === state.filter ? " is-active" : ""}" type="button"
+        data-filter="${escapeHtml(id)}" aria-pressed="${id === state.filter}">
         ${escapeHtml(label)}<span data-count="${escapeHtml(id)}"></span>
       </button>`).join("");
   }
 
   function updateHero() {
     const highlighted = [
-      ...movies.filter((movie) => movie.featured),
-      ...movies.filter((movie) => !movie.featured)
+      ...freeMovies.filter((movie) => movie.featured),
+      ...freeMovies.filter((movie) => !movie.featured)
     ].slice(0, 3);
 
     document.querySelectorAll(".hero-case img").forEach((image, index) => {
@@ -248,14 +325,28 @@
   }
 
   function updateCounts() {
-    document.querySelector('[data-count="all"]').textContent = movies.length;
-    document.querySelector('[data-count="era:classic"]').textContent = movies.filter((movie) => movieEra(movie) === "classic").length;
-    document.querySelector('[data-count="era:recent"]').textContent = movies.filter((movie) => movieEra(movie) === "recent").length;
+    const counts = {
+      all: movies.length,
+      "collection:showing": movies.filter((movie) => movie.collection === "showing").length,
+      "collection:classic": movies.filter((movie) => movie.collection === "classic").length,
+      "collection:free": movies.filter((movie) => movie.collection === "free").length,
+      favorites: state.favorites.size
+    };
+
+    for (const [id, count] of Object.entries(counts)) {
+      const counter = document.querySelector(`[data-count="${id}"]`);
+      if (counter) counter.textContent = count;
+    }
     for (const category of categoryOrder) {
       const counter = document.querySelector(`[data-count="category:${category}"]`);
       if (counter) counter.textContent = movies.filter((movie) => movie.category === category).length;
     }
-    document.querySelector('[data-count="favorites"]').textContent = state.favorites.size;
+
+    elements.totalClassic.textContent = counts["collection:classic"];
+    elements.totalFree.textContent = counts["collection:free"];
+    elements.totalShowing.textContent = counts["collection:showing"];
+    elements.doorClassic.textContent = `${counts["collection:classic"]} 部`;
+    elements.doorShowing.textContent = `${counts["collection:showing"]} 部`;
   }
 
   function updateSummary(total) {
@@ -270,10 +361,9 @@
       elements.summary.textContent = `找到 ${total} 部与“${state.query}”相关的影片`;
     } else if (state.filter === "favorites") {
       elements.summary.textContent = `我的想看 · ${total} 部 · 点击封面看大图`;
-    } else if (state.filter === "era:classic") {
-      elements.summary.textContent = `经典碟架 · ${total} 部 · 点击封面看大图`;
-    } else if (state.filter === "era:recent") {
-      elements.summary.textContent = `近作碟架 · ${total} 部 · 点击封面看大图`;
+    } else if (state.filter.startsWith("collection:")) {
+      const collection = state.filter.slice(11);
+      elements.summary.textContent = `${collectionTitles[collection] || "影片"} · ${total} 部 · 点击封面看大图`;
     } else if (state.filter.startsWith("category:")) {
       elements.summary.textContent = `${state.filter.slice(9)} · ${total} 部 · 点击封面看大图`;
     } else {
@@ -322,9 +412,13 @@
 
     activeMovieId = id;
     lastDialogTrigger = trigger || document.activeElement;
+    const hasPoster = Boolean(movie.poster);
 
-    elements.dialogImage.src = movie.poster;
-    elements.dialogImage.alt = `《${movie.title}》大图海报`;
+    elements.dialogImage.hidden = !hasPoster;
+    elements.dialogImage.src = hasPoster ? movie.poster : "";
+    elements.dialogImage.alt = hasPoster ? `《${movie.title}》大图海报` : "";
+    elements.dialogTypographic.hidden = hasPoster;
+    elements.dialogTypographic.innerHTML = hasPoster ? "" : typographicCover(movie);
     elements.dialogSource.textContent = movie.source;
     elements.dialogTitle.textContent = movie.title;
     elements.dialogMeta.textContent = movie.meta;
@@ -332,6 +426,17 @@
     elements.dialogWatch.href = movie.watchUrl;
     elements.dialogWatch.setAttribute("aria-label", `前往${movie.source}${movie.watchLabel || "在线观看"}《${movie.title}》（新窗口打开）`);
     elements.dialogWatchLabel.textContent = movie.watchLabel || "在线观看";
+
+    if (movie.secondaryUrl) {
+      elements.dialogSecondary.hidden = false;
+      elements.dialogSecondary.href = movie.secondaryUrl;
+      elements.dialogSecondary.textContent = movie.secondaryLabel || "查看详情";
+    } else {
+      elements.dialogSecondary.hidden = true;
+      elements.dialogSecondary.removeAttribute("href");
+      elements.dialogSecondary.textContent = "";
+    }
+
     elements.dialogTags.innerHTML = (movie.tags || []).map((tag) => `<span class="dialog-tag">${escapeHtml(tag)}</span>`).join("");
     updateDialogFavorite();
 
@@ -385,18 +490,21 @@
     }
   }
 
+  function setFilter(filter) {
+    state.filter = filter;
+    for (const button of elements.filters.querySelectorAll(".filter-chip")) {
+      const active = button.dataset.filter === filter;
+      button.classList.toggle("is-active", active);
+      button.setAttribute("aria-pressed", String(active));
+    }
+    render();
+  }
+
   function resetAll() {
     state.filter = "all";
     state.query = "";
     elements.search.value = "";
-
-    for (const button of elements.filters.querySelectorAll(".filter-chip")) {
-      const active = button.dataset.filter === "all";
-      button.classList.toggle("is-active", active);
-      button.setAttribute("aria-pressed", String(active));
-    }
-
-    render();
+    setFilter("all");
   }
 
   function showToast(message) {
@@ -404,6 +512,153 @@
     elements.toast.textContent = message;
     elements.toast.classList.add("is-visible");
     toastTimer = setTimeout(() => elements.toast.classList.remove("is-visible"), 2200);
+  }
+
+  function categoryOf(genres) {
+    const preferred = ["动画", "喜剧", "动作", "爱情", "科幻", "悬疑", "惊悚", "犯罪", "冒险", "剧情"];
+    for (const item of preferred) {
+      if (genres.includes(item)) return item;
+    }
+    return genres[0] || "剧情";
+  }
+
+  function mapShowingItem(item, index) {
+    const subjectId = String(item.id || "");
+    const subtitle = clean(item.card_subtitle || item.info || "");
+    const parts = subtitle.split("/").map(clean).filter(Boolean);
+    const year = /^\d{4}$/.test(String(item.year || "")) ? Number(item.year) : null;
+    const country = parts[1] || "";
+    const genres = (parts[2] || "").split(/\s+/).map(clean).filter(Boolean);
+    const director = clean((item.directors || [""])[0]);
+    const actors = (item.actors || []).slice(0, 5).map(clean).filter(Boolean);
+    const rating = item.rating || {};
+    const title = clean(item.title);
+    const originalTitle = clean(item.original_title);
+
+    return {
+      id: `showing-douban-${subjectId}`,
+      title,
+      originalTitle,
+      category: categoryOf(genres),
+      tags: genres,
+      meta: [year || clean(item.release_date), country, genres.join(" ")].filter(Boolean).join(" / "),
+      synopsis: "正在豆瓣热映榜，点击“今日热映与排片”查看票房、口碑、影院和座位。",
+      source: "豆瓣热映",
+      poster: "",
+      watchUrl: "today/",
+      secondaryUrl: item.url || `https://m.douban.com/movie/subject/${subjectId}/`,
+      secondaryLabel: "豆瓣详情",
+      watchLabel: "今日热映与排片",
+      keywords: [title, originalTitle, director, ...actors, ...genres, "豆瓣热映", "正在上映"],
+      featured: true,
+      collection: "showing",
+      rating: Number.isFinite(Number(rating.value)) ? Number(rating.value) : null,
+      ratingCount: Number(rating.count) || 0,
+      rank: index + 1,
+      year,
+      director,
+      actors,
+      country
+    };
+  }
+
+  function updateCategories() {
+    categoryOrder.splice(0, categoryOrder.length, ...new Set(movies.map((movie) => movie.category).filter(Boolean)));
+  }
+
+  function applyShowing(items, status) {
+    liveShowing = items;
+    showingStatus = status;
+    movies = [...freeMovies, ...classicMovies, ...liveShowing];
+    updateCategories();
+    renderFilters();
+    updateHero();
+    render();
+    window.__DYK_SHOWING_STATUS__ = { status, count: liveShowing.length };
+  }
+
+  function readShowingCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(showingCacheKey) || "null");
+      if (!cached || !Array.isArray(cached.items) || !cached.items.length) return null;
+      if (Date.now() - Number(cached.savedAt || 0) > showingTtl) return null;
+      return cached;
+    } catch {
+      return null;
+    }
+  }
+
+  function isCoolingDown() {
+    try {
+      return Date.now() - Number(localStorage.getItem(showingCooldownKey) || 0) < showingCooldown;
+    } catch {
+      return false;
+    }
+  }
+
+  function startCooldown() {
+    try {
+      localStorage.setItem(showingCooldownKey, String(Date.now()));
+    } catch {
+      // 私密模式下保留静态兜底即可。
+    }
+  }
+
+  function requestLiveShowing() {
+    if (showingRequest) return showingRequest;
+    showingRequest = new Promise((resolve) => {
+      const callbackName = `__dykShowing_${Date.now()}`;
+      const script = document.createElement("script");
+      let settled = false;
+
+      const finish = (items, status) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        script.remove();
+        delete window[callbackName];
+        applyShowing(items, status);
+        resolve();
+      };
+
+      const timer = setTimeout(() => finish([], "timeout"), 8000);
+      window[callbackName] = (payload) => {
+        const items = Array.isArray(payload?.subject_collection_items) ? payload.subject_collection_items : [];
+        const mapped = items.slice(0, 30).filter((item) => item.id).map(mapShowingItem);
+        if (!mapped.length) {
+          startCooldown();
+          finish([], "empty");
+          return;
+        }
+        try {
+          localStorage.setItem(showingCacheKey, JSON.stringify({ savedAt: Date.now(), items: mapped }));
+        } catch {
+          // 缓存失败不影响本次展示。
+        }
+        finish(mapped, "live");
+      };
+      script.src = `https://m.douban.com/rexxar/api/v2/subject_collection/movie_showing/items?count=30&for_mobile=1&callback=${callbackName}&referer=${encodeURIComponent("https://m.douban.com/")}`;
+      script.onerror = () => {
+        startCooldown();
+        finish([], "blocked");
+      };
+      document.head.appendChild(script);
+    }).finally(() => {
+      showingRequest = null;
+    });
+    return showingRequest;
+  }
+
+  function initializeShowing() {
+    const cached = readShowingCache();
+    if (cached) {
+      applyShowing(cached.items.map((item, index) => ({ ...item, rank: item.rank || index + 1 })), "cache");
+    }
+    if (!cached && !isCoolingDown()) {
+      const start = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
+      start(() => requestLiveShowing());
+    }
+    window.__DYK_SHOWING_STATUS__ = { status: showingStatus, count: liveShowing.length };
   }
 
   elements.search.addEventListener("input", () => {
@@ -420,16 +675,15 @@
 
   elements.filters.addEventListener("click", (event) => {
     const button = event.target.closest("[data-filter]");
-    if (!button) return;
+    if (button) setFilter(button.dataset.filter);
+  });
 
-    state.filter = button.dataset.filter;
-    for (const chip of elements.filters.querySelectorAll(".filter-chip")) {
-      const active = chip === button;
-      chip.classList.toggle("is-active", active);
-      chip.setAttribute("aria-pressed", String(active));
-    }
-
-    render();
+  document.querySelectorAll("[data-jump-filter]").forEach((link) => {
+    link.addEventListener("click", () => {
+      state.query = "";
+      elements.search.value = "";
+      setFilter(link.dataset.jumpFilter);
+    });
   });
 
   elements.shelves.addEventListener("click", (event) => {
@@ -473,10 +727,9 @@
     }, 140);
   });
 
-  elements.totalMovies.textContent = movies.length;
-  elements.totalClassic.textContent = movies.filter((movie) => movieEra(movie) === "classic").length;
-  elements.doorCount.textContent = `${movies.length} 部`;
-  updateHero();
+  updateCategories();
   renderFilters();
+  updateHero();
   render();
+  initializeShowing();
 })();
