@@ -2,8 +2,8 @@
   "use strict";
 
   const storageKey = "jiudian-guan-favorites-v1";
-  const showingCacheKey = "dyk-showing-cache-v1";
-  const showingCooldownKey = "dyk-showing-cooldown-v1";
+  const showingCacheKey = "dyk-showing-cache-v2";
+  const showingCooldownKey = "dyk-showing-cooldown-v2";
   const showingTtl = 4 * 60 * 60 * 1000;
   const showingCooldown = 3 * 60 * 60 * 1000;
   const categoryOrder = [];
@@ -36,10 +36,12 @@
     collection: movie.collection || "free"
   }));
   const classicMovies = Array.isArray(window.CLASSICS) ? window.CLASSICS : [];
+  const showingFallback = Array.isArray(window.SHOWING) ? window.SHOWING : [];
+  const showingPosters = new Map(showingFallback.map((movie) => [movie.id, movie.poster]).filter(([, poster]) => poster));
   let liveShowing = [];
   let showingStatus = "fallback";
   let showingRequest = null;
-  let movies = [...freeMovies, ...classicMovies, ...(Array.isArray(window.SHOWING) ? window.SHOWING : [])];
+  let movies = [...freeMovies, ...classicMovies, ...showingFallback];
 
   const state = {
     filter: "all",
@@ -544,7 +546,7 @@
       meta: [year || clean(item.release_date), country, genres.join(" ")].filter(Boolean).join(" / "),
       synopsis: "正在豆瓣热映榜，点击“今日热映与排片”查看票房、口碑、影院和座位。",
       source: "豆瓣热映",
-      poster: "",
+      poster: showingPosters.get(`showing-douban-${subjectId}`) || "",
       watchUrl: "today/",
       secondaryUrl: item.url || `https://m.douban.com/movie/subject/${subjectId}/`,
       secondaryLabel: "豆瓣详情",
@@ -635,12 +637,17 @@
           finish([], "empty");
           return;
         }
+        const liveMap = new Map(mapped.map((movie) => [movie.id, movie]));
+        const merged = showingFallback.map((movie) => {
+          const update = liveMap.get(movie.id);
+          return update ? { ...movie, ...update, poster: movie.poster } : movie;
+        });
         try {
-          localStorage.setItem(showingCacheKey, JSON.stringify({ savedAt: Date.now(), items: mapped }));
+          localStorage.setItem(showingCacheKey, JSON.stringify({ savedAt: Date.now(), items: merged }));
         } catch {
           // 缓存失败不影响本次展示。
         }
-        finish(mapped, "live");
+        finish(merged, "live");
       };
       script.src = `https://m.douban.com/rexxar/api/v2/subject_collection/movie_showing/items?count=30&for_mobile=1&callback=${callbackName}&referer=${encodeURIComponent("https://m.douban.com/")}`;
       script.onerror = () => {
