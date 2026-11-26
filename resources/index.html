@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="电影书架资源库：收集、整理、搜索和导入影视资源，支持本地保存与 GoComicMosaic 公开资源 API。">
+  <meta name="theme-color" content="#151311">
+  <title>资源库 · 电影书架</title>
+  <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body id="top">
+  <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="icon-film" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+      <path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4M7 12h10"></path>
+    </symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24">
+      <circle cx="11" cy="11" r="7"></circle>
+      <path d="m20 20-4-4"></path>
+    </symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24">
+      <path d="M12 5v14M5 12h14"></path>
+    </symbol>
+    <symbol id="icon-heart" viewBox="0 0 24 24">
+      <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1.1-1.1a5.5 5.5 0 0 0-7.8 7.8l1.1 1.1L12 21l7.8-7.5 1.1-1.1a5.5 5.5 0 0 0-.1-7.8Z"></path>
+    </symbol>
+    <symbol id="icon-edit" viewBox="0 0 24 24">
+      <path d="M12 20h9"></path>
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z"></path>
+    </symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24">
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v5M14 11v5"></path>
+    </symbol>
+    <symbol id="icon-download" viewBox="0 0 24 24">
+      <path d="M12 3v12m0 0 5-5m-5 5-5-5M4 19h16"></path>
+    </symbol>
+    <symbol id="icon-upload" viewBox="0 0 24 24">
+      <path d="M12 16V4m0 0 5 5m-5-5L7 9M4 19h16"></path>
+    </symbol>
+    <symbol id="icon-link" viewBox="0 0 24 24">
+      <path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path>
+      <path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"></path>
+    </symbol>
+    <symbol id="icon-close" viewBox="0 0 24 24">
+      <path d="m6 6 12 12M18 6 6 18"></path>
+    </symbol>
+    <symbol id="icon-arrow" viewBox="0 0 24 24">
+      <path d="M5 12h14M13 6l6 6-6 6"></path>
+    </symbol>
+    <symbol id="icon-grid" viewBox="0 0 24 24">
+      <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+      <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+      <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+      <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+    </symbol>
+  </svg>
+
+  <div class="ambient-glow" aria-hidden="true"></div>
+
+  <header class="site-header">
+    <a class="brand" href="../" aria-label="电影书架首页">
+      <span class="brand-mark"><svg class="icon"><use href="#icon-film"></use></svg></span>
+      <span class="brand-copy"><strong>电影书架</strong><small>CLASSIC &amp; NOW</small></span>
+    </a>
+    <nav class="main-nav" aria-label="主导航">
+      <a href="../">电影书架</a>
+      <a href="../today/">今日热映</a>
+      <a class="is-active" href="./" aria-current="page">资源库</a>
+      <a href="../#about">片源说明</a>
+    </nav>
+    <div class="header-note"><span class="status-dot"></span>本地保存 · 随时导入导出</div>
+  </header>
+
+  <main>
+    <section class="resource-hero" aria-labelledby="resource-title">
+      <div>
+        <p class="eyebrow"><span></span>RESOURCE COLLECTION</p>
+        <h1 id="resource-title">把散落的资源，<br><em>收进同一座书架。</em></h1>
+        <p class="hero-description">收集影片、剧集和网盘链接，按类型整理，随时搜索与编辑。数据默认保存在当前浏览器，也可以导出备份，或从 GoComicMosaic 的公开资源接口导入。</p>
+        <div class="hero-actions">
+          <button class="primary-button" id="add-resource" type="button"><svg class="icon"><use href="#icon-plus"></use></svg>新增资源</button>
+          <button class="secondary-button" id="import-movies" type="button"><svg class="icon"><use href="#icon-film"></use></svg>导入免费正片</button>
+          <button class="secondary-button" id="open-api-import" type="button"><svg class="icon"><use href="#icon-link"></use></svg>连接 GoComicMosaic</button>
+        </div>
+      </div>
+      <div class="resource-stats" aria-label="资源库概况">
+        <div><strong id="stat-total">0</strong><span>条资源</span></div>
+        <div><strong id="stat-favorites">0</strong><span>条收藏</span></div>
+        <div><strong id="stat-types">0</strong><span>种类型</span></div>
+        <p>资源与链接由你整理；是否可观看、是否需要会员或付费，以原站点当前页面为准。</p>
+      </div>
+    </section>
+
+    <section class="resource-library" aria-labelledby="library-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">YOUR COLLECTION</p>
+          <h2 id="library-title">我的资源</h2>
+        </div>
+        <div class="data-actions">
+          <button class="text-button" id="import-json" type="button"><svg class="icon"><use href="#icon-upload"></use></svg>导入 JSON</button>
+          <button class="text-button" id="export-json" type="button"><svg class="icon"><use href="#icon-download"></use></svg>导出 JSON</button>
+        </div>
+      </div>
+
+      <div class="browser-panel" aria-label="查找资源">
+        <div class="toolbar-main">
+          <label class="search-box" for="search-input">
+            <svg class="icon"><use href="#icon-search"></use></svg>
+            <span class="sr-only">搜索资源</span>
+            <input id="search-input" type="search" placeholder="搜片名、简介、标签、来源…" autocomplete="off">
+            <button id="clear-search" class="clear-search" type="button" aria-label="清空搜索" hidden>
+              <svg class="icon"><use href="#icon-close"></use></svg>
+            </button>
+          </label>
+          <div class="filter-row">
+            <label class="select-box"><span class="sr-only">资源类型</span><select id="type-filter"></select></label>
+            <label class="select-box"><span class="sr-only">排序方式</span><select id="sort-select">
+              <option value="updated">最近更新</option>
+              <option value="created">最近添加</option>
+              <option value="title">按片名</option>
+              <option value="links">链接最多</option>
+            </select></label>
+            <button class="favorite-filter" id="favorite-filter" type="button" aria-pressed="false">
+              <svg class="icon"><use href="#icon-heart"></use></svg>只看收藏
+            </button>
+          </div>
+        </div>
+        <div class="result-bar">
+          <p id="result-summary" aria-live="polite"></p>
+          <button id="reset-filters" class="text-button" type="button" hidden>清除筛选<svg class="icon"><use href="#icon-arrow"></use></svg></button>
+        </div>
+      </div>
+
+      <section id="resource-grid" class="resource-grid" aria-label="资源列表"></section>
+
+      <section id="empty-state" class="empty-state" hidden>
+        <div class="empty-icon"><svg class="icon"><use href="#icon-grid"></use></svg></div>
+        <h2>这一格还没有资源</h2>
+        <p id="empty-message">新增一条资源，或从电影书架导入免费正片。</p>
+        <button class="primary-button" id="empty-add" type="button">新增第一条资源</button>
+      </section>
+    </section>
+
+    <section class="source-note" aria-labelledby="source-note-title">
+      <div class="source-note-icon"><svg class="icon"><use href="#icon-link"></use></svg></div>
+      <div>
+        <h2 id="source-note-title">资源有出处，整理有边界</h2>
+        <p>本页是独立的资源管理工具，不复制 GoComicMosaic 源码。可连接其公开资源 API 导入标题、简介、海报与链接；导入前请确认你有权使用对应内容。GoComicMosaic 仓库未提供 LICENSE，本页仅保留项目名称、来源链接与接口兼容能力。</p>
+      </div>
+      <div class="source-links">
+        <a href="https://github.com/fish2018/GoComicMosaic" target="_blank" rel="noopener noreferrer">GoComicMosaic 项目<svg class="icon"><use href="#icon-arrow"></use></svg></a>
+        <a href="https://github.com/fish2018/GoComicMosaic/blob/main/README.md" target="_blank" rel="noopener noreferrer">项目说明<svg class="icon"><use href="#icon-arrow"></use></svg></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-brand"><svg class="icon"><use href="#icon-film"></use></svg><strong>电影书架</strong></div>
+    <p>资源库数据保存在当前浏览器；清理浏览器数据前请先导出备份。</p>
+    <a href="#top" class="back-to-top">回到顶部↑</a>
+  </footer>
+
+  <dialog id="resource-dialog" class="resource-dialog" aria-labelledby="editor-title">
+    <form id="resource-form" class="dialog-shell">
+      <button id="editor-close" class="dialog-close" type="button" aria-label="关闭编辑窗口"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <div class="editor-heading">
+        <p class="section-kicker">RESOURCE EDITOR</p>
+        <h2 id="editor-title">新增资源</h2>
+        <p>链接只接受 http 或 https 地址；海报可以填写图片地址或站内相对路径。</p>
+      </div>
+      <div class="form-grid">
+        <label class="field field-wide"><span>片名 / 资源名 <b>*</b></span><input id="field-title" name="title" type="text" maxlength="160" required placeholder="例如：某部电影、某部剧集"></label>
+        <label class="field"><span>英文名</span><input id="field-title-en" name="titleEn" type="text" maxlength="200" placeholder="可选"></label>
+        <label class="field"><span>类型</span><input id="field-type" name="type" type="text" maxlength="40" placeholder="例如：电影、剧集、动画"></label>
+        <label class="field field-wide"><span>简介</span><textarea id="field-description" name="description" rows="4" maxlength="4000" placeholder="剧情、季集信息或整理备注"></textarea></label>
+        <label class="field field-wide"><span>海报地址</span><input id="field-poster" name="poster" type="text" maxlength="1000" placeholder="https://… 或 ../assets/posters/…"></label>
+        <label class="field"><span>来源</span><input id="field-source" name="source" type="text" maxlength="120" placeholder="例如：1905电影网、个人整理"></label>
+        <label class="field"><span>标签</span><input id="field-tags" name="tags" type="text" maxlength="240" placeholder="用逗号分隔，例如：动作, 犯罪, 2026"></label>
+      </div>
+      <fieldset class="links-editor">
+        <legend>资源链接</legend>
+        <div id="link-rows" class="link-rows"></div>
+        <button id="add-link" class="text-button" type="button"><svg class="icon"><use href="#icon-plus"></use></svg>添加链接</button>
+      </fieldset>
+      <label class="check-field"><input id="field-favorite" type="checkbox"><span>同时加入收藏</span></label>
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+      <div class="dialog-actions editor-actions">
+        <button class="primary-button" type="submit">保存资源</button>
+        <button id="editor-cancel" class="secondary-button" type="button">取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title">
+    <div class="dialog-shell">
+      <button id="detail-close" class="dialog-close" type="button" aria-label="关闭资源详情"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <div class="detail-poster"><img id="detail-image" src="" alt=""><div id="detail-typographic" class="detail-typographic" hidden></div></div>
+      <div class="detail-info">
+        <p id="detail-source" class="detail-source"></p>
+        <h2 id="detail-title"></h2>
+        <p id="detail-meta" class="detail-meta"></p>
+        <div id="detail-tags" class="detail-tags"></div>
+        <p id="detail-description" class="detail-description"></p>
+        <section id="detail-links-section" class="detail-links-section" hidden>
+          <h3>资源链接</h3>
+          <div id="detail-links" class="detail-links"></div>
+        </section>
+        <p id="detail-empty-links" class="detail-empty-links" hidden>还没有添加链接。</p>
+        <div class="dialog-actions detail-actions">
+          <button id="detail-favorite" class="favorite-action" type="button" aria-pressed="false"><svg class="icon"><use href="#icon-heart"></use></svg><span>加入收藏</span></button>
+          <button id="detail-edit" class="secondary-button" type="button"><svg class="icon"><use href="#icon-edit"></use></svg>编辑</button>
+          <button id="detail-delete" class="danger-button" type="button"><svg class="icon"><use href="#icon-trash"></use></svg>删除</button>
+        </div>
+        <p class="detail-note">打开链接会前往原站点；内容可用性与版权状态以原站点为准。</p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="api-dialog" class="api-dialog" aria-labelledby="api-title">
+    <form id="api-form" class="dialog-shell api-shell">
+      <button id="api-close" class="dialog-close" type="button" aria-label="关闭接口导入窗口"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <p class="section-kicker">PUBLIC API IMPORT</p>
+      <h2 id="api-title">连接 GoComicMosaic</h2>
+      <p>填写公开资源列表接口。页面会读取返回的标题、类型、简介、海报与链接，不会提交账号、Cookie 或密码。</p>
+      <label class="field"><span>公开接口地址</span><input id="api-endpoint" type="url" value="https://dm.xueximeng.com/api/resources/public" placeholder="https://…/api/resources/public" required></label>
+      <p class="api-hint">接口需允许当前网页跨域读取（CORS）。若返回的是 HTML 首页，说明后端接口当前未开放或地址不正确。</p>
+      <p id="api-status" class="api-status" role="status"></p>
+      <div class="dialog-actions editor-actions">
+        <button id="api-submit" class="primary-button" type="submit">读取并导入</button>
+        <button id="api-cancel" class="secondary-button" type="button">取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <input id="json-file" type="file" accept="application/json,.json" hidden>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="../data.js"></script>
+  <script src="app.js?v=20261127a"></script>
+</body>
+</html>
