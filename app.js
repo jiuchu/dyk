@@ -6,9 +6,21 @@
   const showingCooldownKey = "dyk-showing-cooldown-v2";
   const showingTtl = 4 * 60 * 60 * 1000;
   const showingCooldown = 3 * 60 * 60 * 1000;
-  const detailCacheKey = "dyk-detail-cache-v1";
+  const detailCacheKey = "dyk-detail-cache-v2";
   const detailCache = new Map();
   const detailRequests = new Map();
+  const posterObserver = "IntersectionObserver" in window
+    ? new IntersectionObserver((entries, observer) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const image = entry.target;
+          const source = image.dataset.src;
+          if (source) image.src = source;
+          image.removeAttribute("data-src");
+          observer.unobserve(image);
+        }
+      }, { rootMargin: "800px 0px" })
+    : null;
   try {
     const savedDetails = JSON.parse(localStorage.getItem(detailCacheKey) || "{}");
     for (const [id, detail] of Object.entries(savedDetails)) detailCache.set(id, detail);
@@ -274,6 +286,16 @@
     return `assets/posters/thumbs/${filename}.webp`;
   }
 
+  function observePosterImages() {
+    document.querySelectorAll(".case-cover img[data-src]").forEach((image) => {
+      if (posterObserver) posterObserver.observe(image);
+      else {
+        image.src = image.dataset.src;
+        image.removeAttribute("data-src");
+      }
+    });
+  }
+
   function renderMovie(movie, index) {
     const isFavorite = state.favorites.has(movie.id);
     const title = escapeHtml(movie.title);
@@ -287,7 +309,7 @@
           aria-label="查看《${title}》的大图与剧情简介">
           <span class="case-spine"><b>${escapeHtml(movie.source)}</b> · ${escapeHtml(movie.category)}${year ? ` · ${year}` : ""}</span>
           ${hasPoster
-            ? `<img src="${escapeHtml(thumbnailFor(movie.poster))}" alt="《${title}》封面" loading="lazy" decoding="async" fetchpriority="low">`
+            ? `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="${escapeHtml(thumbnailFor(movie.poster))}" alt="《${title}》封面" decoding="async">`
             : typographicCover(movie)}
           <span class="source-badge">${escapeHtml(movie.collection === "classic" ? "豆瓣 Top250" : movie.collection === "showing" ? "豆瓣热映" : movie.source)}</span>
           ${movie.featured && movie.collection === "free" ? '<span class="hot-badge">热门</span>' : ""}
@@ -423,6 +445,7 @@
         </div>
         ${renderRows(group.items, columns, groupIndex)}
       </section>`).join("");
+    observePosterImages();
   }
 
   function doubanIdFor(movie) {
@@ -497,7 +520,7 @@
       settled = true;
       cleanup();
       const detail = {
-        synopsis: clean(payload?.synopsis),
+        synopsis: clean(payload?.intro),
         director: namesFrom(payload?.directors).join(" / "),
         actors: namesFrom(payload?.actors).slice(0, 10)
       };
