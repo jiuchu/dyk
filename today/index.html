@@ -212,7 +212,6 @@ const MINR = 8;                        // 展开短评至少要这么多条带�
 // 豆瓣的三个榜单都没收录的片子，手工补条目号；键是去掉标点空格的专资办片名。
 // 条目号就是 https://movie.douban.com/subject/<这里>/ 地址里那串数字。
 const SEED_IDS = {
-  '欢迎来龙餐馆': '35811064',
   '我们仅有一次的人生': '36424371'
 };
 
@@ -249,6 +248,7 @@ const dbShowing = () => jsonp(DB_BASE + '/subject_collection/movie_showing/items
   { count: 60, for_mobile: 1, ck: 'jq_a' });
 const dbSoon = () => jsonp(DB_BASE + '/subject_collection/movie_soon/items',
   { count: 30, for_mobile: 1, ck: 'jq_a' });
+const dbSearch = name => jsonp(DB_BASE + '/search/suggestion', { q: name });
 /* 豆瓣：单片详情、最近短评 —— 展开时才发 */
 const dbDetail = id => jsonp(`${DB_BASE}/movie/${id}`, { for_mobile: 1, ck: 'jq_a' });
 const dbCmts = id => jsonp(`${DB_BASE}/movie/${id}/interests`,
@@ -458,7 +458,7 @@ function renderTable() {
         ${f.info ? `<span class="sub">${esc(f.info)}</span>` : ''}</td>
       <td class="num"><span class="score ${cls}" data-cell="s" title="${esc(hasR ? '' : nrReason(f))}">${
         hasR ? r.value.toFixed(1) : f.id ? (nrReason(f) || '未开分') : '未收录'}</span></td>
-      <td class="num">${hasR ? cnt(r.count) : '<span class="dash">—</span>'}</td>
+      <td class="num" data-cell="n">${hasR ? cnt(r.count) : '<span class="dash">—</span>'}</td>
       <td class="num" data-cell="d">${f.id ? (durCache.has(f.id) ? durHtml(durCache.get(f.id))
                           : '<span class="dash" title="还没去取，点开这一行就会补上">待补</span>')
                           : '<span class="dash">—</span>'}</td>
@@ -467,7 +467,7 @@ function renderTable() {
         <span style="font-size:11px;color:var(--sub)">${(f.day / tot * 100).toFixed(1)}%</span></td>
       <td class="num">${f.session ? (f.aud / f.session).toFixed(1) : '—'}</td>
       <td class="num">${f.total >= 10000 ? (f.total / 1e4).toFixed(2) + '<small style="color:var(--sub)"> 亿</small>' : f.total.toFixed(0) + '<small style="color:var(--sub)"> 万</small>'}<br>${trend}</td>
-      <td><span class="verdict ${vc}" title="${esc(verdict(f)[2])}">${vt}</span></td>
+      <td><span class="verdict ${vc}" data-cell="v" title="${esc(verdict(f)[2])}">${vt}</span></td>
     </tr><tr class="detail" data-d="${i}" hidden><td colspan="10"></td></tr>`;
   }).join('');
   document.querySelectorAll('tr.row').forEach(tr => tr.onclick = () => toggle(+tr.dataset.i, tr));
@@ -764,7 +764,8 @@ async function buildDetail(f) {
    没补上的格子写「待补」，不写破折号——破折号是没这个数，待补是这个数拿得到、这次没去拿。 */
 async function hydrate() {
   if (detBlocked()) return;                    // 三个钟头前刚被挡过，这一趟不去敲门
-  const need = S.films.filter(f => f.id && !f.show && !durCache.has(f.id));
+  const need = S.films.filter(f => f.id && !f.show && !durCache.has(f.id))
+    .sort((a, b) => Number(Boolean(b.seedHit)) - Number(Boolean(a.seedHit)));
   for (const f of need) {
     const i = S.films.indexOf(f);
     const tr = document.querySelector(`tr.row[data-i="${i}"]`);
@@ -785,11 +786,21 @@ async function hydrate() {
         if (sub) sub.textContent = f.info;
         else tr.querySelector('.nm').insertAdjacentHTML('beforeend', `<span class="sub">${esc(f.info)}</span>`);
       }
-      if (d.rating && d.rating.value && f.db && f.db.rating) {
+      if (d.rating && d.rating.value && f.db) {
         f.db.rating = d.rating;
+        const r = d.rating;
         const sc = tr.querySelector('[data-cell="s"]');
-        if (sc) { sc.textContent = d.rating.value.toFixed(1);
-          sc.className = 'score ' + (d.rating.count < MINI ? 's-none' : d.rating.value >= 6.5 ? 's-good' : d.rating.value >= 5 ? 's-mid' : 's-bad'); }
+        if (sc) { sc.textContent = r.value.toFixed(1);
+          sc.className = 'score ' + (r.count < MINI ? 's-none' : r.value >= 6.5 ? 's-good' : r.value >= 5 ? 's-mid' : 's-bad'); }
+        const nc = tr.querySelector('[data-cell="n"]');
+        if (nc) nc.textContent = cnt(r.count);
+        const vc = tr.querySelector('[data-cell="v"]');
+        if (vc) {
+          const [cls, text, why] = verdict(f);
+          vc.className = 'verdict ' + cls;
+          vc.textContent = text;
+          vc.title = why;
+        }
       }
     } catch (e) { markBlocked(); break; }   // 被挡回来了：这一趟到此为止，记下时刻，三小时内不再自动试
   }
@@ -819,6 +830,16 @@ async function boot() {
   }
   if (showing.status !== 'fulfilled') bad.push('豆瓣评分榜');
 
+  const missing = D.top10Films.map(f => f.filmName).filter(name => !byName.has(norm(name)));
+  const searched = await Promise.allSettled(missing.map(name => dbSearch(name)));
+  searched.forEach((result, index) => {
+    if (result.status !== 'fulfilled') return;
+    const name = missing[index];
+    const hit = (result.value.cards || []).find(card =>
+      card.target_type === 'movie' && norm(card.target && card.target.title) === norm(name));
+    if (hit && hit.target && hit.target.id) byName.set(norm(name), hit.target);
+  });
+
   S.films = D.top10Films.map(f => {
     const key = norm(f.filmName);
     const db = byName.get(key) || null;
@@ -828,7 +849,7 @@ async function boot() {
       day: parseFloat(f.daySales), total: f.filmTotalSales == null ? parseFloat(f.daySales) : f.filmTotalSales,
       session: f.daySession, aud: f.dayAudience,
       db: db || (seedHit ? { id, rating: null } : null), id: db ? db.id : (id || null),
-      info: db ? db.card_subtitle : '', dur: '' };
+      info: db ? db.card_subtitle : '', dur: '', seedHit };
   });
   renderMarket(); renderTable(); hydrate();
 
