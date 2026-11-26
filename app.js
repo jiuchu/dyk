@@ -6,6 +6,15 @@
   const showingCooldownKey = "dyk-showing-cooldown-v2";
   const showingTtl = 4 * 60 * 60 * 1000;
   const showingCooldown = 3 * 60 * 60 * 1000;
+  const detailCacheKey = "dyk-detail-cache-v1";
+  const detailCache = new Map();
+  const detailRequests = new Map();
+  try {
+    const savedDetails = JSON.parse(localStorage.getItem(detailCacheKey) || "{}");
+    for (const [id, detail] of Object.entries(savedDetails)) detailCache.set(id, detail);
+  } catch {
+    // 缓存不可用时继续实时读取。
+  }
   const categoryOrder = [];
   const categoryNotes = {
     "动作": "追车、搏斗与正邪较量",
@@ -73,6 +82,8 @@
     dialogTitle: document.getElementById("dialog-title"),
     dialogMeta: document.getElementById("dialog-meta"),
     dialogTags: document.getElementById("dialog-tags"),
+    dialogDirector: document.getElementById("dialog-director"),
+    dialogActors: document.getElementById("dialog-actors"),
     dialogSynopsis: document.getElementById("dialog-synopsis"),
     dialogWatch: document.getElementById("dialog-watch"),
     dialogWatchLabel: document.getElementById("dialog-watch-label"),
@@ -414,6 +425,98 @@
       </section>`).join("");
   }
 
+  function doubanIdFor(movie) {
+    return String(movie.id).match(/(\d+)$/)?.[1] || "";
+  }
+
+  function namesFrom(value) {
+    return (Array.isArray(value) ? value : [])
+      .map((item) => typeof item === "string" ? item : item?.name)
+      .map(clean)
+      .filter(Boolean);
+  }
+
+  function renderCredits(movie) {
+    const actors = Array.isArray(movie.actors) ? movie.actors : [];
+    elements.dialogDirector.textContent = movie.director ? `导演：${movie.director}` : "";
+    elements.dialogDirector.hidden = !movie.director;
+    elements.dialogActors.textContent = actors.length
+      ? `主演：${actors.slice(0, 10).join("、")}${actors.length > 10 ? "等" : ""}`
+      : "";
+    elements.dialogActors.hidden = actors.length === 0;
+  }
+
+  function applyMovieDetail(movie, detail) {
+    if (detail.synopsis) movie.synopsis = detail.synopsis;
+    if (detail.director) movie.director = detail.director;
+    if (detail.actors?.length) movie.actors = detail.actors;
+  }
+
+  function saveDetailCache() {
+    try {
+      const entries = [...detailCache.entries()].slice(-300);
+      localStorage.setItem(detailCacheKey, JSON.stringify(Object.fromEntries(entries)));
+    } catch {
+      // 缓存满时保留本次内存结果。
+    }
+  }
+
+  function loadMovieDetails(movie) {
+    const subjectId = doubanIdFor(movie);
+    if (!subjectId) return;
+
+    const cached = detailCache.get(subjectId);
+    if (cached) {
+      applyMovieDetail(movie, cached);
+      if (activeMovieId === movie.id) {
+        elements.dialogSynopsis.textContent = movie.synopsis || "";
+        renderCredits(movie);
+      }
+      return;
+    }
+    if (detailRequests.has(subjectId)) return;
+
+    const callbackName = `__dykDetail_${subjectId}_${Date.now()}`;
+    const script = document.createElement("script");
+    let settled = false;
+    let timer;
+    const cleanup = () => {
+      clearTimeout(timer);
+      script.remove();
+      delete window[callbackName];
+      detailRequests.delete(subjectId);
+    };
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+    };
+
+    window[callbackName] = (payload) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      const detail = {
+        synopsis: clean(payload?.synopsis),
+        director: namesFrom(payload?.directors).join(" / "),
+        actors: namesFrom(payload?.actors).slice(0, 10)
+      };
+      if (!detail.synopsis && !detail.director && !detail.actors.length) return;
+      detailCache.set(subjectId, detail);
+      saveDetailCache();
+      applyMovieDetail(movie, detail);
+      if (activeMovieId === movie.id) {
+        elements.dialogSynopsis.textContent = movie.synopsis || "";
+        renderCredits(movie);
+      }
+    };
+    timer = setTimeout(fail, 7000);
+    script.onerror = fail;
+    script.src = `https://m.douban.com/rexxar/api/v2/subject/${subjectId}?callback=${callbackName}&referer=${encodeURIComponent(`https://m.douban.com/movie/subject/${subjectId}/`)}`;
+    detailRequests.set(subjectId, true);
+    document.head.appendChild(script);
+  }
+
   function openMovie(id, trigger) {
     const movie = movies.find((item) => item.id === id);
     if (!movie) return;
@@ -446,6 +549,8 @@
     }
 
     elements.dialogTags.innerHTML = (movie.tags || []).map((tag) => `<span class="dialog-tag">${escapeHtml(tag)}</span>`).join("");
+    renderCredits(movie);
+    loadMovieDetails(movie);
     updateDialogFavorite();
 
     if (!elements.dialog.open) elements.dialog.showModal();
