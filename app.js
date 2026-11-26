@@ -102,6 +102,8 @@
     dialogSynopsis: document.getElementById("dialog-synopsis"),
     dialogWatch: document.getElementById("dialog-watch"),
     dialogWatchLabel: document.getElementById("dialog-watch-label"),
+    dialogWatchSources: document.getElementById("dialog-watch-sources"),
+    dialogWatchSourceLinks: document.getElementById("dialog-watch-source-links"),
     dialogSecondary: document.getElementById("dialog-secondary"),
     dialogFavorite: document.getElementById("dialog-favorite")
   };
@@ -601,6 +603,28 @@
     full.src = movie.poster;
   }
 
+  const watchPlatforms = [
+    { name: "腾讯视频", url: (q) => `https://v.qq.com/x/search/?q=${q}` },
+    { name: "爱奇艺", url: (q) => `https://so.iqiyi.com/so/q_${q}` },
+    { name: "优酷", url: (q) => `https://so.youku.com/search_video/q_${q}` },
+    { name: "芒果TV", url: (q) => `https://so.mgtv.com/so?k=${q}` },
+    { name: "哔哩哔哩", url: (q) => `https://search.bilibili.com/all?keyword=${q}` },
+    { name: "1905电影网", url: (q) => `https://www.1905.com/search/?q=${q}` }
+  ];
+
+  function renderWatchSources(movie) {
+    const visible = movie.collection === "classic";
+    elements.dialogWatchSources.hidden = !visible;
+    if (!visible) {
+      elements.dialogWatchSourceLinks.innerHTML = "";
+      return;
+    }
+    const query = encodeURIComponent(movie.title);
+    elements.dialogWatchSourceLinks.innerHTML = watchPlatforms.map((platform) =>
+      `<a href="${escapeHtml(platform.url(query))}" target="_blank" rel="noopener noreferrer">${escapeHtml(platform.name)}</a>`
+    ).join("");
+  }
+
   function openMovie(id, trigger) {
     const movie = movies.find((item) => item.id === id);
     if (!movie) return;
@@ -617,6 +641,7 @@
     elements.dialogWatch.href = movie.watchUrl;
     elements.dialogWatch.setAttribute("aria-label", `前往${movie.source}${movie.watchLabel || "在线观看"}《${movie.title}》（新窗口打开）`);
     elements.dialogWatchLabel.textContent = movie.watchLabel || "在线观看";
+    renderWatchSources(movie);
 
     if (movie.secondaryUrl) {
       elements.dialogSecondary.hidden = false;

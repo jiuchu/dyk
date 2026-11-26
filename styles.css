@@ -1648,6 +1648,59 @@ main,
   height: 15px;
 }
 
+.watch-sources {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-strong);
+}
+
+.watch-sources[hidden] {
+  display: none;
+}
+
+.watch-sources p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.watch-sources p span {
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.watch-source-links {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.watch-source-links a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.watch-source-links a:hover {
+  border-color: rgba(239, 198, 139, 0.42);
+  background: rgba(239, 198, 139, 0.07);
+  color: var(--accent-light);
+}
+
 .dialog-note {
   margin: 14px 0 0;
   color: var(--faint);
