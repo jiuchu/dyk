@@ -617,7 +617,12 @@
         clearTimeout(timer);
         script.remove();
         delete window[callbackName];
-        applyShowing(items, status);
+        if (items.length) {
+          applyShowing(items, status);
+        } else {
+          showingStatus = status;
+          window.__DYK_SHOWING_STATUS__ = { status, count: movies.filter((movie) => movie.collection === "showing").length };
+        }
         resolve();
       };
 
@@ -655,8 +660,7 @@
       applyShowing(cached.items.map((item, index) => ({ ...item, rank: item.rank || index + 1 })), "cache");
     }
     if (!cached && !isCoolingDown()) {
-      const start = window.requestIdleCallback || ((callback) => setTimeout(callback, 1200));
-      start(() => requestLiveShowing());
+      setTimeout(() => requestLiveShowing(), 1200);
     }
     window.__DYK_SHOWING_STATUS__ = { status: showingStatus, count: liveShowing.length };
   }
