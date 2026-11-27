@@ -1198,19 +1198,8 @@
   if (cachedResourcesChanged) saveResources();
   render();
 
-  async function loadExtraCatalog() {
-    window.EXTRA_RESOURCES = [];
-    const version = "20261127i";
-    for (let index = 0; index < 8; index += 1) {
-      const script = document.createElement("script");
-      script.src = `catalog-${index}.js?v=${version}`;
-      document.head.appendChild(script);
-    }
-    const deadline = Date.now() + 30000;
-    while (window.EXTRA_RESOURCES.length < 14125 && Date.now() < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    if (window.EXTRA_RESOURCES.length < 14125) return;
+  let extraCatalogRefreshTimer = 0;
+  function refreshExtraCatalog() {
     resources = loadResources();
     let changed = false;
     for (const resource of resources) {
@@ -1218,6 +1207,25 @@
     }
     if (changed) saveResources();
     render();
+  }
+
+  function loadExtraCatalog() {
+    window.EXTRA_RESOURCES = [];
+    const version = "20261127j";
+    const scheduleRefresh = () => {
+      window.clearTimeout(extraCatalogRefreshTimer);
+      extraCatalogRefreshTimer = window.setTimeout(refreshExtraCatalog, 150);
+    };
+    for (let index = 0; index < 8; index += 1) {
+      const script = document.createElement("script");
+      script.src = `catalog-${index}.js?v=${version}`;
+      script.onload = scheduleRefresh;
+      script.onerror = () => {
+        script.remove();
+        scheduleRefresh();
+      };
+      document.head.appendChild(script);
+    }
   }
 
   loadExtraCatalog();
