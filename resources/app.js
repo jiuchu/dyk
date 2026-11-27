@@ -1197,4 +1197,28 @@
   }
   if (cachedResourcesChanged) saveResources();
   render();
+
+  async function loadExtraCatalog() {
+    window.EXTRA_RESOURCES = [];
+    const version = "20261127i";
+    for (let index = 0; index < 8; index += 1) {
+      const script = document.createElement("script");
+      script.src = `catalog-${index}.js?v=${version}`;
+      document.head.appendChild(script);
+    }
+    const deadline = Date.now() + 30000;
+    while (window.EXTRA_RESOURCES.length < 14125 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    if (window.EXTRA_RESOURCES.length < 14125) return;
+    resources = loadResources();
+    let changed = false;
+    for (const resource of resources) {
+      if (applyDoubanCache(resource, resource.origin === "电影书架")) changed = true;
+    }
+    if (changed) saveResources();
+    render();
+  }
+
+  loadExtraCatalog();
 })();
