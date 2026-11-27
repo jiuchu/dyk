@@ -1378,7 +1378,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127s";
+    const version = "20261127t";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
@@ -1386,13 +1386,10 @@
       extraCatalogRefreshTimer = window.setTimeout(refreshExtraCatalog, 150);
     };
     const loadChunk = (index, attempt = 0) => new Promise((resolve) => {
+      const before = window.EXTRA_RESOURCES.length;
       const script = document.createElement("script");
       script.src = `catalog-${index}.js?v=${version}${attempt ? `&retry=${attempt}` : ""}`;
-      script.onload = () => {
-        scheduleRefresh();
-        resolve();
-      };
-      script.onerror = () => {
+      const fail = () => {
         script.remove();
         if (attempt < 2) {
           window.setTimeout(() => loadChunk(index, attempt + 1).then(resolve), 400 * (attempt + 1));
@@ -1405,6 +1402,14 @@
           resolve();
         }
       };
+      script.onload = () => {
+        if (window.EXTRA_RESOURCES.length === before) fail();
+        else {
+          scheduleRefresh();
+          resolve();
+        }
+      };
+      script.onerror = fail;
       document.head.appendChild(script);
     });
     const worker = async () => {
