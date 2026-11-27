@@ -630,11 +630,11 @@
     elements.grid.innerHTML = visible.map((resource, index) => {
       const hasPoster = Boolean(resource.poster);
       const poster = posterThumb(resource.poster);
-      const eager = index < 18;
+      const eager = index < 6;
       return `<article class="resource-card">
         <button class="resource-case" type="button" data-open="${escapeHtml(resource.id)}" aria-label="查看《${escapeHtml(resource.title)}》详情">
           <div class="resource-cover">
-            ${hasPoster ? `<img src="${escapeHtml(poster)}" alt="《${escapeHtml(resource.title)}》海报" width="400" height="600" loading="${eager ? "eager" : "lazy"}" ${eager && index < 6 ? 'fetchpriority="high"' : ""} decoding="async" referrerpolicy="no-referrer">` : ""}
+            ${hasPoster ? `<img src="${escapeHtml(poster)}" alt="《${escapeHtml(resource.title)}》海报" width="400" height="600" loading="${eager ? "eager" : "lazy"}" ${eager && index < 2 ? 'fetchpriority="high"' : ""} decoding="async" referrerpolicy="no-referrer">` : ""}
             <div class="resource-typographic" ${hasPoster ? "hidden" : ""}>${escapeHtml(resource.title)}</div>
             <span class="resource-spine">${escapeHtml(resource.type)}</span>
             ${resource.rating ? `<span class="resource-rating">${escapeHtml(resource.ratingSource || "评分")} ${resource.rating.toFixed(1)}</span>` : ""}
@@ -1457,5 +1457,7 @@
     });
   }
 
-  loadExtraCatalog();
+  window.requestAnimationFrame(() => {
+    window.setTimeout(loadExtraCatalog, 0);
+  });
 })();
