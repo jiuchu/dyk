@@ -1378,7 +1378,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127u";
+    const version = "20261127v";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
