@@ -173,12 +173,11 @@
     coffeerun: { project: "https://studio.blender.org/projects/coffee-run/", download: "https://download.blender.org/demo/movies/CoffeeRun/" }
   };
 
-  function isArchiveUrl(value) {
-    try {
-      return ["archive.org", "www.archive.org", "web.archive.org"].includes(new URL(value).hostname.toLowerCase());
-    } catch {
-      return false;
-    }
+  function archiveSourceLinks(title, titleEn) {
+    const query = encodeURIComponent(titleEn || title);
+    return [
+      { label: "Internet Archive · 用户上传检索", url: `https://archive.org/search?query=${query}` }
+    ];
   }
 
   function officialSourceLinks(title, titleEn) {
@@ -201,16 +200,6 @@
       { label: "Wikimedia Commons · 公共领域 / CC 视频", url: `https://commons.wikimedia.org/w/index.php?search=${query}&title=Special:MediaSearch&type=video` },
       { label: "Public Domain Torrents · 公共领域种子", url: "https://publicdomaintorrents.info/" }
     ];
-  }
-
-  function applyDownloadPolicy(resource) {
-    const year = Number(resource.tags.find((tag) => /^\d{4}$/.test(tag))) || 0;
-    const publicDomainCandidate = year > 0 && year <= 1930;
-    if (publicDomainCandidate) return resource;
-    return {
-      ...resource,
-      downloads: resource.downloads.filter((link) => !isArchiveUrl(link.url))
-    };
   }
 
   function normalizeTags(value) {
@@ -361,20 +350,30 @@
               { label: "Blender Studio · 官方下载", url: open.project },
               { label: "Blender · 官方下载目录", url: open.download }
             ], resource.downloads);
-            resource.downloadNotice = "Blender 开放电影采用 CC BY 许可，可免费下载；请保留署名。";
+            resource.downloadNotice = "Blender 开放电影采用 CC BY 许可，可免费下载；请保留署名。另含用户上传来源，版权与可用性以原页为准。";
           } else if (sourceText.includes("1905") && watchUrl) {
-            mergeLinks([{ label: "1905电影网 · 官方免费片源", url: watchUrl }], resource.downloads);
-            resource.downloadNotice = "1905 正版免费片源；是否提供下载以原页面为准。";
+            mergeLinks([
+              { label: "1905电影网 · 官方免费片源", url: watchUrl },
+              ...archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn)
+            ], resource.downloads);
+            resource.downloadNotice = "包含 1905 官方免费片源与 Internet Archive 用户上传检索；版权与可用性以原页为准。";
           } else if (prefix !== "showing") {
             if (year && Number(year) <= 1930) {
-              mergeLinks(publicDomainSourceLinks(movie.title, movie.originalTitle || movie.titleEn), resource.downloads);
-              resource.downloadNotice = "公共领域候选来源；下载前请查看原页的版权与许可说明。";
+              mergeLinks([
+                ...publicDomainSourceLinks(movie.title, movie.originalTitle || movie.titleEn),
+                ...archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn)
+              ], resource.downloads);
+              resource.downloadNotice = "包含公共领域候选来源与 Internet Archive 用户上传检索；下载前请查看原页的版权与许可说明。";
             } else {
-              mergeLinks(officialSourceLinks(movie.title, movie.originalTitle || movie.titleEn), resource.downloads);
-              resource.downloadNotice = "正版平台需购买、租赁或会员；购买或租赁后可下载，离线下载以平台 App 为准。";
+              mergeLinks([
+                ...officialSourceLinks(movie.title, movie.originalTitle || movie.titleEn),
+                ...archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn)
+              ], resource.downloads);
+              resource.downloadNotice = "正版平台需购买、租赁或会员；购买或租赁后可下载。Internet Archive 为用户上传来源，版权与可用性请自行确认。";
             }
-          } else if (!resource.downloads.length) {
-            resource.downloadNotice = "影片仍在上映或尚未发行数字版，暂无正版下载来源。";
+          } else {
+            mergeLinks(archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn), resource.downloads);
+            resource.downloadNotice = "影片仍在上映或尚未发行数字版；Internet Archive 为用户上传来源，版权与可用性请自行确认。";
           }
           for (const alias of [movie.title, movie.originalTitle, movie.titleEn]) {
             const key = titleKey(alias);
@@ -393,7 +392,6 @@
       mergeLinks(resource.links, match.resource.links);
       mergeLinks(resource.downloads, match.resource.downloads);
     }
-    for (const resource of movies) resource.downloads = applyDownloadPolicy(resource).downloads;
     return [...extra, ...movies];
   }
 
@@ -484,7 +482,7 @@
             { ...resource, ...override, links, downloads, downloadNotice: override.downloadNotice || resource.downloadNotice },
             { links, downloads }
           );
-          return applyDownloadPolicy(merged);
+          return merged;
         });
       localStorage.setItem(catalogMigrationKey, "2");
       localStorage.setItem(storageKey, JSON.stringify(stored));
@@ -1380,7 +1378,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127r";
+    const version = "20261127s";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
