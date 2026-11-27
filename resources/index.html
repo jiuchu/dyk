@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#151311">
   <title>资源库 · 电影书架</title>
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261127m">
+  <link rel="stylesheet" href="styles.css?v=20261127n">
 </head>
 <body id="top">
   <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -216,11 +216,12 @@
           <h3>资源链接</h3>
           <div id="detail-links" class="detail-links"></div>
         </section>
-        <section id="detail-downloads-section" class="detail-links-section" hidden>
+        <section id="detail-downloads-section" class="detail-links-section">
           <h3>下载资源</h3>
           <div id="detail-downloads" class="detail-links"></div>
+          <p id="detail-downloads-empty" class="detail-empty-links" hidden>暂无下载数据。</p>
         </section>
-        <p id="detail-empty-links" class="detail-empty-links" hidden>还没有添加链接或下载资源。</p>
+        <p id="detail-empty-links" class="detail-empty-links" hidden>还没有添加资源链接。</p>
         <div class="dialog-actions detail-actions">
           <button id="detail-favorite" class="favorite-action" type="button" aria-pressed="false"><svg class="icon"><use href="#icon-heart"></use></svg><span>加入收藏</span></button>
           <button id="detail-edit" class="secondary-button" type="button"><svg class="icon"><use href="#icon-edit"></use></svg>编辑</button>
@@ -271,6 +272,6 @@
   <script src="../data.js"></script>
   <script src="../classics.js"></script>
   <script src="../showing.js"></script>
-  <script src="app.js?v=20261127m"></script>
+  <script src="app.js?v=20261127n"></script>
 </body>
 </html>

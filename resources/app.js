@@ -77,6 +77,7 @@
     detailLinks: document.getElementById("detail-links"),
     detailDownloadsSection: document.getElementById("detail-downloads-section"),
     detailDownloads: document.getElementById("detail-downloads"),
+    detailDownloadsEmpty: document.getElementById("detail-downloads-empty"),
     detailEmptyLinks: document.getElementById("detail-empty-links"),
     detailFavorite: document.getElementById("detail-favorite"),
     api: document.getElementById("api-dialog"),
@@ -249,6 +250,8 @@
       { items: window.CLASSICS, prefix: "classic" },
       { items: window.SHOWING, prefix: "showing" }
     ];
+    const titleKey = (value) => clean(value).toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "");
+    const movieAliases = [];
     const movies = collections.flatMap(({ items, prefix }) => {
       if (!Array.isArray(items)) return [];
       return items.map((movie) => {
@@ -260,7 +263,7 @@
         if (movie.secondaryUrl) {
           links.push({ label: movie.secondaryLabel || "更多信息", url: movie.secondaryUrl });
         }
-        return normalizeResource({
+        const resource = normalizeResource({
           id: `${prefix}-${movie.id}`,
           title: movie.title,
           titleEn: movie.originalTitle || movie.titleEn,
@@ -277,8 +280,30 @@
           doubanId: String(movie.id).match(/(\d+)$/)?.[1] || "",
           origin: "电影书架"
         });
+        if (resource) {
+          const year = String(movie.year || "");
+          for (const alias of [movie.title, movie.originalTitle, movie.titleEn]) {
+            const key = titleKey(alias);
+            if (key) movieAliases.push({ key, year, resource });
+          }
+        }
+        return resource;
       }).filter(Boolean);
     });
+    const mergeLinks = (incoming, target) => {
+      for (const link of incoming) {
+        if (!target.some((item) => item.url === link.url)) target.push({ ...link });
+      }
+    };
+    for (const resource of extra) {
+      const year = resource.tags.find((tag) => /^\d{4}$/.test(tag)) || "";
+      const keys = [resource.title, resource.titleEn].map(titleKey).filter(Boolean);
+      const match = movieAliases.find((alias) => alias.year === year && keys.includes(alias.key))
+        || movieAliases.find((alias) => keys.includes(alias.key));
+      if (!match) continue;
+      mergeLinks(resource.links, match.resource.links);
+      mergeLinks(resource.downloads, match.resource.downloads);
+    }
     return [...extra, ...movies];
   }
 
@@ -737,11 +762,12 @@
     elements.detailTags.innerHTML = resource.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
     elements.detailDescription.textContent = resource.description || "暂无简介。";
     elements.detailLinksSection.hidden = resource.links.length === 0;
-    elements.detailEmptyLinks.hidden = resource.links.length !== 0 || resource.downloads.length !== 0;
+    elements.detailEmptyLinks.hidden = resource.links.length !== 0;
     elements.detailLinks.innerHTML = resource.links.map((link) =>
       `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(link.label)}</span><svg class="icon"><use href="#icon-arrow"></use></svg></a>`
     ).join("");
-    elements.detailDownloadsSection.hidden = resource.downloads.length === 0;
+    elements.detailDownloadsSection.hidden = false;
+    elements.detailDownloadsEmpty.hidden = resource.downloads.length !== 0;
     elements.detailDownloads.innerHTML = resource.downloads.map((link) =>
       `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(link.label)}</span><svg class="icon"><use href="#icon-arrow"></use></svg></a>`
     ).join("");
@@ -1214,7 +1240,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127m";
+    const version = "20261127n";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
