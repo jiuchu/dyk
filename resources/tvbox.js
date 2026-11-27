@@ -3,7 +3,7 @@
   "use strict";
 
   const STORAGE_KEY = "dyk-tvbox-sources-v1";
-  const VERSION = "20261127za";
+  const VERSION = "20261127zb";
   const HLS_VERSION = "20261127y";
   const ALLOWED_SITE_TYPES = new Set([1, 3, 4]);
   const TYPE_LABELS = { 0: "Spider / Jar", 1: "网页规则", 2: "未知", 3: "苹果 CMS", 4: "JSON 接口" };
@@ -644,6 +644,17 @@
     ensureHls().catch(() => {});
   }
 
+  function findPlaybackFallback(url, label, video) {
+    if (video !== elements.detailVideo || !state.detailItem) return "";
+    const currentLine = state.detailItem.lines?.[state.activeLine];
+    const currentEpisode = currentLine?.episodes?.find((episode) => episode.url === url || episode.name === label);
+    for (const line of state.detailItem.lines || []) {
+      const candidate = line.episodes?.find((episode) => episode.url !== url && /\.m3u8(?:$|[?#])/i.test(episode.url) && (currentEpisode ? episode.index === currentEpisode.index || episode.name === currentEpisode.name : episode.name === label));
+      if (candidate) return candidate.url;
+    }
+    return "";
+  }
+
   async function resolvePlayableUrl(url) {
     const parsed = new URL(url);
     if (!/\/share\//i.test(parsed.pathname)) return url;
@@ -688,7 +699,18 @@
       if (isCurrent() && video.readyState < 1) status.textContent = "视频加载较慢，可切换线路或打开原地址。";
     }, 30000);
     try {
-      target = await resolvePlayableUrl(target);
+      const fallback = findPlaybackFallback(target, label, video);
+      const resolving = resolvePlayableUrl(target);
+      if (fallback) {
+        let fallbackTimer = 0;
+        target = await Promise.race([
+          resolving,
+          new Promise((resolve) => { fallbackTimer = window.setTimeout(() => resolve(fallback), 8000); })
+        ]).catch(() => fallback);
+        window.clearTimeout(fallbackTimer);
+      } else {
+        target = await resolving;
+      }
       if (!isCurrent()) return;
       if (/\.m3u8(?:$|[?#])/i.test(target)) {
         const Hls = await ensureHls();
