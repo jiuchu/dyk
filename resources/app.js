@@ -1415,27 +1415,37 @@
       const script = document.createElement("script");
       script.src = `catalog-${index}.js?v=${version}${attempt ? `&retry=${attempt}` : ""}`;
       let settled = false;
-      const fail = () => {
+      let handedOff = false;
+      let retryTimer = 0;
+      const finish = () => {
         if (settled) return;
         settled = true;
-        script.remove();
+        window.clearTimeout(retryTimer);
+        resolve();
+      };
+      const retry = () => {
+        if (settled || handedOff) return;
         if (attempt < 2) {
-          window.setTimeout(() => loadChunk(index, attempt + 1).then(resolve), 400 * (attempt + 1));
+          handedOff = true;
+          loadChunk(index, attempt + 1).then(finish);
         } else {
           if (!catalogErrorShown) {
             catalogErrorShown = true;
             showToast("部分资源加载失败，请刷新页面重试。", true);
           }
-          resolve();
+          finish();
         }
       };
+      const fail = () => {
+        if (settled) return;
+        script.remove();
+        if (!handedOff) retry();
+      };
+      if (attempt < 2) retryTimer = window.setTimeout(retry, 45000);
       script.onload = () => {
         if (settled) return;
         if (window.EXTRA_RESOURCES.length === before) fail();
-        else {
-          settled = true;
-          resolve();
-        }
+        else finish();
       };
       script.onerror = fail;
       document.head.appendChild(script);
