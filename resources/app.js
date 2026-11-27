@@ -678,18 +678,18 @@
     doubanRequests.add(subjectId);
     const callbackName = `dykDouban_${subjectId}_${Date.now().toString(36)}`;
     const script = document.createElement("script");
-    let finished = false;
-    const cleanup = () => {
-      if (finished) return;
-      finished = true;
+    const finishRequest = () => {
       clearTimeout(timer);
       doubanRequests.delete(subjectId);
-      delete window[callbackName];
       script.remove();
     };
-    const timer = setTimeout(cleanup, 12000);
+    const timer = setTimeout(() => {
+      doubanRequests.delete(subjectId);
+      script.remove();
+    }, 30000);
     window[callbackName] = (payload) => {
-      cleanup();
+      finishRequest();
+      delete window[callbackName];
       if (!payload || typeof payload !== "object") return;
       const intro = clean(payload.intro);
       const rating = Number(payload.rating?.value);
@@ -704,7 +704,10 @@
       if (activeId === resource.id && elements.detail.open) renderDetail(resource.id);
       else render();
     };
-    script.onerror = cleanup;
+    script.onerror = () => {
+      finishRequest();
+      delete window[callbackName];
+    };
     script.src = `https://m.douban.com/rexxar/api/v2/subject/${subjectId}?callback=${callbackName}&referer=${encodeURIComponent(`https://m.douban.com/movie/subject/${subjectId}/`)}`;
     document.head.append(script);
   }
@@ -1211,7 +1214,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127j";
+    const version = "20261127k";
     const scheduleRefresh = () => {
       window.clearTimeout(extraCatalogRefreshTimer);
       extraCatalogRefreshTimer = window.setTimeout(refreshExtraCatalog, 150);
