@@ -3,7 +3,7 @@
   "use strict";
 
   const STORAGE_KEY = "dyk-tvbox-sources-v1";
-  const VERSION = "20261127w";
+  const VERSION = "20261127y";
   const ALLOWED_SITE_TYPES = new Set([1, 3, 4]);
   const TYPE_LABELS = { 0: "Spider / Jar", 1: "网页规则", 2: "未知", 3: "苹果 CMS", 4: "JSON 接口" };
   const PRESET = {
@@ -631,8 +631,17 @@
     return window.Hls;
   }
 
+  async function resolvePlayableUrl(url) {
+    const parsed = new URL(url);
+    if (!/\/share\//i.test(parsed.pathname)) return url;
+    const html = await fetchTextWithFallback(url);
+    const match = html.match(/(?:const|let|var)\s+url\s*=\s*["']([^"']+)["']/i);
+    if (!match) throw new Error("分享页没有返回视频地址，请切换线路");
+    return new URL(match[1], url).href;
+  }
+
   async function playUrl(url, label = "", video = elements.detailVideo, status = elements.playerStatus) {
-    const target = safeHttpUrl(url);
+    let target = safeHttpUrl(url);
     if (!target) {
       toast("该地址不是浏览器可播放的 HTTP(S) 视频。", true);
       return;
@@ -645,6 +654,7 @@
     video.poster = "";
     status.textContent = label ? `正在加载：${label}` : "正在加载视频…";
     try {
+      target = await resolvePlayableUrl(target);
       if (/\.m3u8(?:$|[?#])/i.test(target)) {
         const Hls = await ensureHls();
         if (Hls.isSupported()) {
