@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#151311">
   <title>资源库 · 电影书架</title>
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261127o">
+  <link rel="stylesheet" href="styles.css?v=20261127p">
 </head>
 <body id="top">
   <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -201,7 +201,7 @@
   <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title">
     <div class="dialog-shell">
       <button id="detail-close" class="dialog-close" type="button" aria-label="关闭资源详情"><svg class="icon"><use href="#icon-close"></use></svg></button>
-      <div class="detail-poster"><img id="detail-image" src="" alt=""><div id="detail-typographic" class="detail-typographic" hidden></div></div>
+      <div class="detail-poster"><img id="detail-image" src="" alt="" decoding="async" fetchpriority="high"><div id="detail-typographic" class="detail-typographic" hidden></div></div>
       <div class="detail-info">
         <p id="detail-source" class="detail-source"></p>
         <h2 id="detail-title"></h2>
@@ -272,6 +272,6 @@
   <script src="../data.js"></script>
   <script src="../classics.js"></script>
   <script src="../showing.js"></script>
-  <script src="app.js?v=20261127o"></script>
+  <script src="app.js?v=20261127p"></script>
 </body>
 </html>

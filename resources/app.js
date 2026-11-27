@@ -792,8 +792,20 @@
     elements.detailTypographic.hidden = hasPoster;
     elements.detailImage.alt = hasPoster ? `《${resource.title}》海报` : "";
     if (hasPoster) {
-      elements.detailImage.src = resource.poster;
+      const fullSrc = resource.poster;
+      elements.detailImage.dataset.fullSrc = fullSrc;
+      const upgrade = () => {
+        const target = new URL(elements.detailImage.dataset.fullSrc, location.href).href;
+        const current = new URL(elements.detailImage.currentSrc || elements.detailImage.src, location.href).href;
+        if (current !== target) elements.detailImage.src = target;
+      };
+      elements.detailImage.onload = upgrade;
+      elements.detailImage.onerror = upgrade;
+      elements.detailImage.src = posterThumb(fullSrc);
     } else {
+      elements.detailImage.onload = null;
+      elements.detailImage.onerror = null;
+      elements.detailImage.removeAttribute("data-full-src");
       elements.detailImage.removeAttribute("src");
     }
     elements.detailTypographic.textContent = resource.title;
@@ -1285,7 +1297,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127o";
+    const version = "20261127p";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
