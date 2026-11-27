@@ -1415,11 +1415,9 @@
       const script = document.createElement("script");
       script.src = `catalog-${index}.js?v=${version}${attempt ? `&retry=${attempt}` : ""}`;
       let settled = false;
-      let timer = 0;
       const fail = () => {
         if (settled) return;
         settled = true;
-        window.clearTimeout(timer);
         script.remove();
         if (attempt < 2) {
           window.setTimeout(() => loadChunk(index, attempt + 1).then(resolve), 400 * (attempt + 1));
@@ -1431,13 +1429,11 @@
           resolve();
         }
       };
-      timer = window.setTimeout(fail, 60000);
       script.onload = () => {
         if (settled) return;
         if (window.EXTRA_RESOURCES.length === before) fail();
         else {
           settled = true;
-          window.clearTimeout(timer);
           resolve();
         }
       };
