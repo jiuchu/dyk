@@ -1431,7 +1431,7 @@
           resolve();
         }
       };
-      timer = window.setTimeout(fail, 30000);
+      timer = window.setTimeout(fail, 60000);
       script.onload = () => {
         if (settled) return;
         if (window.EXTRA_RESOURCES.length === before) fail();
@@ -1451,7 +1451,7 @@
         await loadChunk(index);
       }
     };
-    Promise.all(Array.from({ length: 3 }, worker)).then(() => {
+    Promise.all(Array.from({ length: 4 }, worker)).then(() => {
       extraCatalogLoading = false;
       refreshExtraCatalog();
     });
