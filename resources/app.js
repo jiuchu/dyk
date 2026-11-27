@@ -173,6 +173,15 @@
     coffeerun: { project: "https://studio.blender.org/projects/coffee-run/", download: "https://download.blender.org/demo/movies/CoffeeRun/" }
   };
 
+  function downloadSearchSourceLinks() {
+    return [
+      { label: "电影天堂 · 站内搜索", url: "https://www.dytt8899.com/" },
+      { label: "电影港 · 站内搜索", url: "https://www.dygang.net/" },
+      { label: "音范丝 · 站内搜索", url: "https://www.yinfans.me/" },
+      { label: "4K电影网 · 站内搜索", url: "http://www.4khd.cn/" }
+    ];
+  }
+
   function archiveSourceLinks(title, titleEn) {
     const query = encodeURIComponent(titleEn || title);
     return [
@@ -354,9 +363,10 @@
           } else if (sourceText.includes("1905") && watchUrl) {
             mergeLinks([
               { label: "1905电影网 · 官方免费片源", url: watchUrl },
+              ...downloadSearchSourceLinks(),
               ...archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn)
             ], resource.downloads);
-            resource.downloadNotice = "包含 1905 官方免费片源与 Internet Archive 用户上传检索；版权与可用性以原页为准。";
+            resource.downloadNotice = "包含 1905 官方免费片源、多个下载站检索入口与 Internet Archive 用户上传检索；版权与可用性以原页为准。";
           } else if (prefix !== "showing") {
             if (year && Number(year) <= 1930) {
               mergeLinks([
@@ -367,13 +377,17 @@
             } else {
               mergeLinks([
                 ...officialSourceLinks(movie.title, movie.originalTitle || movie.titleEn),
+                ...downloadSearchSourceLinks(),
                 ...archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn)
               ], resource.downloads);
-              resource.downloadNotice = "正版平台需购买、租赁或会员；购买或租赁后可下载。Internet Archive 为用户上传来源，版权与可用性请自行确认。";
+              resource.downloadNotice = "正版平台需购买、租赁或会员；购买或租赁后可下载。其余为下载站检索入口与 Internet Archive 用户上传来源，版权与可用性请自行确认。";
             }
           } else {
-            mergeLinks(archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn), resource.downloads);
-            resource.downloadNotice = "影片仍在上映或尚未发行数字版；Internet Archive 为用户上传来源，版权与可用性请自行确认。";
+            mergeLinks([
+              ...downloadSearchSourceLinks(),
+              ...archiveSourceLinks(movie.title, movie.originalTitle || movie.titleEn)
+            ], resource.downloads);
+            resource.downloadNotice = "影片仍在上映或尚未发行数字版；以下为下载站检索入口与 Internet Archive 用户上传来源，版权与可用性请自行确认。";
           }
           for (const alias of [movie.title, movie.originalTitle, movie.titleEn]) {
             const key = titleKey(alias);
@@ -1387,7 +1401,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127w";
+    const version = "20261127x";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
