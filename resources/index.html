@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#151311">
   <title>资源库 · 电影书架</title>
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261127c">
+  <link rel="stylesheet" href="styles.css?v=20261127h">
 </head>
 <body id="top">
   <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -177,9 +177,11 @@
         <label class="field field-wide"><span>片名 / 资源名 <b>*</b></span><input id="field-title" name="title" type="text" maxlength="160" required placeholder="例如：某部电影、某部剧集"></label>
         <label class="field"><span>英文名</span><input id="field-title-en" name="titleEn" type="text" maxlength="200" placeholder="可选"></label>
         <label class="field"><span>类型</span><input id="field-type" name="type" type="text" maxlength="40" placeholder="例如：电影、剧集、动画"></label>
+        <label class="field"><span>评分</span><input id="field-rating" name="rating" type="number" min="0" max="10" step="0.1" placeholder="0-10，选填"></label>
         <label class="field field-wide"><span>简介</span><textarea id="field-description" name="description" rows="4" maxlength="4000" placeholder="剧情、季集信息或整理备注"></textarea></label>
         <label class="field field-wide"><span>海报地址</span><input id="field-poster" name="poster" type="text" maxlength="1000" placeholder="https://… 或 ../assets/posters/…"></label>
         <label class="field"><span>来源</span><input id="field-source" name="source" type="text" maxlength="120" placeholder="例如：1905电影网、个人整理"></label>
+        <label class="field"><span>评分来源</span><input id="field-rating-source" name="ratingSource" type="text" maxlength="80" placeholder="例如：豆瓣、TMDB"></label>
         <label class="field"><span>标签</span><input id="field-tags" name="tags" type="text" maxlength="240" placeholder="用逗号分隔，例如：动作, 犯罪, 2026"></label>
       </div>
       <fieldset class="links-editor">
@@ -203,6 +205,10 @@
       <div class="detail-info">
         <p id="detail-source" class="detail-source"></p>
         <h2 id="detail-title"></h2>
+        <div id="detail-rating" class="detail-rating" hidden>
+          <strong id="detail-rating-value"></strong>
+          <div><span id="detail-rating-label"></span><small id="detail-rating-count"></small></div>
+        </div>
         <p id="detail-meta" class="detail-meta"></p>
         <div id="detail-tags" class="detail-tags"></div>
         <p id="detail-description" class="detail-description"></p>
@@ -210,7 +216,11 @@
           <h3>资源链接</h3>
           <div id="detail-links" class="detail-links"></div>
         </section>
-        <p id="detail-empty-links" class="detail-empty-links" hidden>还没有添加链接。</p>
+        <section id="detail-downloads-section" class="detail-links-section" hidden>
+          <h3>下载资源</h3>
+          <div id="detail-downloads" class="detail-links"></div>
+        </section>
+        <p id="detail-empty-links" class="detail-empty-links" hidden>还没有添加链接或下载资源。</p>
         <div class="dialog-actions detail-actions">
           <button id="detail-favorite" class="favorite-action" type="button" aria-pressed="false"><svg class="icon"><use href="#icon-heart"></use></svg><span>加入收藏</span></button>
           <button id="detail-edit" class="secondary-button" type="button"><svg class="icon"><use href="#icon-edit"></use></svg>编辑</button>
@@ -261,7 +271,7 @@
   <script src="../data.js"></script>
   <script src="../classics.js"></script>
   <script src="../showing.js"></script>
-  <script src="catalog.js?v=20261127f"></script>
-  <script src="app.js?v=20261127f"></script>
+  <script src="catalog.js?v=20261127h"></script>
+  <script src="app.js?v=20261127h"></script>
 </body>
 </html>

@@ -2,8 +2,12 @@
   "use strict";
 
   const storageKey = "dyk-resource-library-v1";
-  const catalogMigrationKey = "dyk-resource-library-catalog-v4";
+  const catalogMigrationKey = "dyk-resource-library-catalog-v6";
+  const doubanCacheKey = "dyk-resource-douban-v1";
   const apiDefault = "https://dm.xueximeng.com/api/resources/public";
+  let builtinResources = [];
+  let builtinById = new Map();
+  let deletedBuiltinIds = new Set();
   let resources = loadResources();
   let editingId = null;
   let activeId = null;
@@ -18,6 +22,13 @@
     limit: 120
   };
   let renderKey = "";
+  const doubanRequests = new Set();
+  let doubanCache = {};
+  try {
+    doubanCache = JSON.parse(localStorage.getItem(doubanCacheKey) || "{}") || {};
+  } catch {
+    doubanCache = {};
+  }
 
   const elements = {
     grid: document.getElementById("resource-grid"),
@@ -41,9 +52,11 @@
     fieldTitle: document.getElementById("field-title"),
     fieldTitleEn: document.getElementById("field-title-en"),
     fieldType: document.getElementById("field-type"),
+    fieldRating: document.getElementById("field-rating"),
     fieldDescription: document.getElementById("field-description"),
     fieldPoster: document.getElementById("field-poster"),
     fieldSource: document.getElementById("field-source"),
+    fieldRatingSource: document.getElementById("field-rating-source"),
     fieldTags: document.getElementById("field-tags"),
     fieldFavorite: document.getElementById("field-favorite"),
     linkRows: document.getElementById("link-rows"),
@@ -53,11 +66,17 @@
     detailTypographic: document.getElementById("detail-typographic"),
     detailSource: document.getElementById("detail-source"),
     detailTitle: document.getElementById("detail-title"),
+    detailRating: document.getElementById("detail-rating"),
+    detailRatingValue: document.getElementById("detail-rating-value"),
+    detailRatingLabel: document.getElementById("detail-rating-label"),
+    detailRatingCount: document.getElementById("detail-rating-count"),
     detailMeta: document.getElementById("detail-meta"),
     detailTags: document.getElementById("detail-tags"),
     detailDescription: document.getElementById("detail-description"),
     detailLinksSection: document.getElementById("detail-links-section"),
     detailLinks: document.getElementById("detail-links"),
+    detailDownloadsSection: document.getElementById("detail-downloads-section"),
+    detailDownloads: document.getElementById("detail-downloads"),
     detailEmptyLinks: document.getElementById("detail-empty-links"),
     detailFavorite: document.getElementById("detail-favorite"),
     api: document.getElementById("api-dialog"),
@@ -139,8 +158,14 @@
   }
 
   function normalizeSimpleLinks(value) {
-    if (!Array.isArray(value)) return [];
-    return value.map((link) => {
+    const entries = Array.isArray(value)
+      ? value
+      : typeof value === "string"
+        ? [value]
+        : value && typeof value === "object"
+          ? Object.entries(value).map(([label, link]) => typeof link === "string" ? { label, url: link } : link)
+          : [];
+    return entries.map((link) => {
       const url = safeHttpUrl(typeof link === "string" ? link : link?.url);
       if (!url) return null;
       const label = clean(typeof link === "string" ? "" : link?.label) || linkLabel(url);
@@ -189,16 +214,25 @@
     if (!title) return null;
     const links = options.links || normalizeSimpleLinks(input.links);
     const createdAt = clean(input.createdAt) || now;
+    const rawRating = Number(input.rating ?? input.score ?? input.vote_average ?? input.douban_rating);
+    const rating = Number.isFinite(rawRating) && rawRating > 0 ? Math.min(10, rawRating) : null;
+    const ratingCount = Math.max(0, Number(input.ratingCount ?? input.rating_count ?? input.vote_count ?? 0) || 0);
     return {
       id: clean(input.id) || uid(),
       title,
       titleEn: clean(input.titleEn || input.title_en),
       type: clean(input.type || input.resource_type) || "未分类",
       description: clean(input.description),
+      descriptionSource: clean(input.descriptionSource || input.description_source),
       poster: normalizePoster(input.poster || input.poster_image),
       source: clean(input.source) || "个人整理",
       tags: normalizeTags(input.tags),
       links,
+      downloads: options.downloads || normalizeSimpleLinks(input.downloads || input.download_links || input.downloadLinks || input.download_url || input.downloadUrl),
+      rating,
+      ratingCount,
+      ratingSource: clean(input.ratingSource || input.rating_source) || (rating ? "评分" : ""),
+      doubanId: clean(input.doubanId || input.douban_id),
       favorite: Boolean(input.favorite),
       createdAt,
       updatedAt: clean(input.updatedAt) || now,
@@ -236,6 +270,11 @@
           source: movie.source || "电影书架",
           tags: [...(Array.isArray(movie.tags) ? movie.tags : []), movie.source].filter(Boolean),
           links: normalizeSimpleLinks(links),
+          downloads: normalizeSimpleLinks(movie.downloads || movie.downloadUrls),
+          rating: movie.rating,
+          ratingCount: movie.ratingCount,
+          ratingSource: movie.rating ? "豆瓣" : "",
+          doubanId: String(movie.id).match(/(\d+)$/)?.[1] || "",
           origin: "电影书架"
         });
       }).filter(Boolean);
@@ -243,36 +282,106 @@
     return [...extra, ...movies];
   }
 
+  function resourceKey(resource) {
+    const year = resource.tags.find((tag) => /^\d{4}$/.test(tag)) || "";
+    const title = resource.title.toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "");
+    return `${title}\n${year}`;
+  }
+
+  function copyResource(resource) {
+    return {
+      ...resource,
+      tags: [...resource.tags],
+      links: resource.links.map((link) => ({ ...link })),
+      downloads: resource.downloads.map((link) => ({ ...link }))
+    };
+  }
+
   function loadResources() {
     try {
+      builtinResources = resourcesFromMovies();
+      builtinById = new Map(builtinResources.map((resource) => [resource.id, resource]));
+      const builtinByKey = new Map(builtinResources.map((resource) => [resourceKey(resource), resource]));
       const raw = localStorage.getItem(storageKey);
       if (raw === null) {
-        const seeded = resourcesFromMovies();
-        localStorage.setItem(storageKey, JSON.stringify(seeded));
-        localStorage.setItem(catalogMigrationKey, "1");
-        return seeded;
+        localStorage.setItem(catalogMigrationKey, "2");
+        return builtinResources.map(copyResource);
       }
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return [];
-      let loaded = parsed.map((item) => normalizeResource(item, { links: normalizeSimpleLinks(item.links) })).filter(Boolean);
-      if (localStorage.getItem(catalogMigrationKey) !== "1") {
-        const byId = new Map(loaded.map((resource) => [resource.id, resource]));
-        for (const resource of resourcesFromMovies()) {
-          if (!byId.has(resource.id)) byId.set(resource.id, resource);
+      let stored;
+      if (Array.isArray(parsed)) {
+        const custom = [];
+        const overrides = {};
+        for (const item of parsed) {
+          const resource = normalizeResource(item, { links: normalizeSimpleLinks(item.links) });
+          if (!resource) continue;
+          const fresh = builtinById.get(resource.id) || builtinByKey.get(resourceKey(resource));
+          if (!fresh) {
+            custom.push(resource);
+            continue;
+          }
+          resource.id = fresh.id;
+          const hasLocalDescription = resource.descriptionSource === "本地编辑";
+          const hasCustomRating = resource.rating && resource.ratingSource !== "豆瓣";
+          const sameLink = (link, list) => list.some((item) => item.label === link.label && item.url === link.url);
+          const customLinks = resource.links.filter((link) => !sameLink(link, fresh.links));
+          const customDownloads = resource.downloads.filter((link) => !sameLink(link, fresh.downloads));
+          if (!resource.favorite && !customLinks.length && !customDownloads.length && !hasLocalDescription && !hasCustomRating) continue;
+          overrides[resource.id] = {
+            ...resource,
+            links: customLinks.length ? customLinks : fresh.links,
+            downloads: customDownloads.length ? customDownloads : fresh.downloads,
+            description: hasLocalDescription ? resource.description : fresh.description || resource.description,
+            descriptionSource: hasLocalDescription ? resource.descriptionSource : fresh.descriptionSource,
+            poster: resource.poster || fresh.poster,
+            rating: hasCustomRating ? resource.rating : fresh.rating ?? resource.rating,
+            ratingCount: hasCustomRating ? resource.ratingCount : fresh.ratingCount || resource.ratingCount,
+            ratingSource: hasCustomRating ? resource.ratingSource : fresh.ratingSource || resource.ratingSource,
+            doubanId: resource.doubanId || fresh.doubanId
+          };
         }
-        loaded = [...byId.values()];
-        localStorage.setItem(storageKey, JSON.stringify(loaded));
-        localStorage.setItem(catalogMigrationKey, "1");
+        stored = { version: 2, custom, overrides, deleted: [] };
+      } else if (parsed && parsed.version === 2) {
+        stored = parsed;
+      } else {
+        return builtinResources;
       }
-      return loaded;
+      const custom = (Array.isArray(stored.custom) ? stored.custom : [])
+        .map((item) => normalizeResource(item, { links: normalizeSimpleLinks(item.links) })).filter(Boolean);
+      const overrides = stored.overrides && typeof stored.overrides === "object" ? stored.overrides : {};
+      deletedBuiltinIds = new Set(Array.isArray(stored.deleted) ? stored.deleted : []);
+      const merged = builtinResources
+        .filter((resource) => !deletedBuiltinIds.has(resource.id))
+        .map((resource) => copyResource(overrides[resource.id]
+          ? normalizeResource({ ...resource, ...overrides[resource.id] }, { links: normalizeSimpleLinks(overrides[resource.id].links || resource.links) })
+          : resource));
+      localStorage.setItem(catalogMigrationKey, "2");
+      localStorage.setItem(storageKey, JSON.stringify(stored));
+      return [...custom, ...merged];
     } catch {
-      return [];
+      return builtinResources.map(copyResource);
     }
   }
 
   function saveResources() {
     try {
-      localStorage.setItem(storageKey, JSON.stringify(resources));
+      const custom = [];
+      const overrides = {};
+      for (const resource of resources) {
+        const fresh = builtinById.get(resource.id);
+        if (!fresh) {
+          custom.push(resource);
+        } else if (JSON.stringify(resource) !== JSON.stringify(fresh)) {
+          overrides[resource.id] = resource;
+        }
+      }
+      localStorage.setItem(storageKey, JSON.stringify({
+        version: 2,
+        custom,
+        overrides,
+        deleted: [...deletedBuiltinIds]
+      }));
+      localStorage.setItem(catalogMigrationKey, "2");
       return true;
     } catch {
       showToast("浏览器存储空间不足，请先导出备份。", true);
@@ -334,7 +443,8 @@
         resource.description,
         resource.source,
         ...resource.tags,
-        ...resource.links.flatMap((link) => [link.label, link.url])
+        ...resource.links.flatMap((link) => [link.label, link.url]),
+        ...resource.downloads.flatMap((link) => [link.label, link.url])
       ].join(" ").toLocaleLowerCase("zh-CN");
       return haystack.includes(query);
     });
@@ -376,6 +486,7 @@
             ${hasPoster ? `<img src="${escapeHtml(resource.poster)}" alt="《${escapeHtml(resource.title)}》海报" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ""}
             <div class="resource-typographic" ${hasPoster ? "hidden" : ""}>${escapeHtml(resource.title)}</div>
             <span class="resource-spine">${escapeHtml(resource.type)}</span>
+            ${resource.rating ? `<span class="resource-rating">${escapeHtml(resource.ratingSource || "评分")} ${resource.rating.toFixed(1)}</span>` : ""}
             <span class="resource-type">${escapeHtml(resource.type)}</span>
           </div>
         </button>
@@ -385,7 +496,7 @@
         <div class="resource-card-copy">
           <h3>${escapeHtml(resource.title)}</h3>
           <p>${escapeHtml(resource.description || resource.titleEn || "暂无简介")}</p>
-          <div class="resource-card-meta"><span>${escapeHtml(resource.source)}</span><span>${resource.links.length} 个链接</span></div>
+          <div class="resource-card-meta"><span>${escapeHtml(resource.source)}</span><span>${resource.downloads.length ? `${resource.downloads.length} 个下载` : `${resource.links.length} 个链接`}</span></div>
         </div>
       </article>`;
     }).join("");
@@ -420,11 +531,14 @@
     elements.fieldType.value = resource?.type || "";
     elements.fieldDescription.value = resource?.description || "";
     elements.fieldPoster.value = resource?.poster || "";
+    elements.fieldRating.value = resource?.rating ?? "";
+    elements.fieldRatingSource.value = resource?.ratingSource || "";
     elements.fieldSource.value = resource?.source || "";
     elements.fieldTags.value = resource?.tags.join(", ") || "";
     elements.fieldFavorite.checked = resource?.favorite || false;
-    if (resource?.links.length) {
-      for (const link of resource.links) addLinkRow(link.label, link.url);
+    const editorLinks = [...(resource?.links || []), ...(resource?.downloads || []).map((link) => ({ ...link, kind: "download" }))];
+    if (editorLinks.length) {
+      for (const link of editorLinks) addLinkRow(link.label, link.url, link.kind);
     } else {
       addLinkRow();
     }
@@ -434,10 +548,14 @@
     setTimeout(() => elements.fieldTitle.focus(), 30);
   }
 
-  function addLinkRow(label = "", url = "") {
+  function addLinkRow(label = "", url = "", kind = "link") {
     const row = document.createElement("div");
     row.className = "link-row";
     row.innerHTML = `
+      <select class="link-kind" aria-label="链接类型">
+        <option value="link"${kind === "link" ? " selected" : ""}>资料/在线</option>
+        <option value="download"${kind === "download" ? " selected" : ""}>下载</option>
+      </select>
       <input class="link-label" type="text" maxlength="80" placeholder="链接名称" aria-label="链接名称" value="${escapeHtml(label)}">
       <input class="link-url" type="url" maxlength="1200" placeholder="https://…" aria-label="链接地址" value="${escapeHtml(url)}">
       <button class="secondary-button link-remove" type="button" aria-label="删除这条链接"><svg class="icon"><use href="#icon-trash"></use></svg></button>`;
@@ -447,15 +565,18 @@
 
   function readEditorLinks() {
     const links = [];
+    const downloads = [];
     for (const row of elements.linkRows.querySelectorAll(".link-row")) {
       const label = clean(row.querySelector(".link-label").value);
       const rawUrl = clean(row.querySelector(".link-url").value);
       if (!label && !rawUrl) continue;
       const url = safeHttpUrl(rawUrl);
       if (!url) throw new Error(`链接地址无效：${rawUrl || "（空）"}`);
-      links.push({ label: label || linkLabel(url), url });
+      const link = { label: label || linkLabel(url), url };
+      if (row.querySelector(".link-kind").value === "download") downloads.push(link);
+      else links.push(link);
     }
-    return links;
+    return { links, downloads };
   }
 
   function saveEditor(event) {
@@ -464,23 +585,31 @@
     try {
       const title = clean(elements.fieldTitle.value);
       if (!title) throw new Error("请填写片名或资源名。");
-      const links = readEditorLinks();
+      const { links, downloads } = readEditorLinks();
       const now = new Date().toISOString();
       const existing = editingId ? resources.find((item) => item.id === editingId) : null;
+      const description = clean(elements.fieldDescription.value);
+      const rawRating = Number(elements.fieldRating.value);
+      const rating = Number.isFinite(rawRating) && rawRating > 0 ? Math.min(10, rawRating) : null;
       const resource = normalizeResource({
         id: existing?.id || uid(),
         title,
         titleEn: elements.fieldTitleEn.value,
         type: elements.fieldType.value,
-        description: elements.fieldDescription.value,
+        description,
+        descriptionSource: description === existing?.description ? existing?.descriptionSource || "" : "本地编辑",
         poster: elements.fieldPoster.value,
         source: elements.fieldSource.value,
         tags: elements.fieldTags.value,
         favorite: elements.fieldFavorite.checked,
+        rating,
+        ratingCount: existing?.ratingCount || 0,
+        ratingSource: elements.fieldRatingSource.value || (rating ? "评分" : ""),
+        doubanId: existing?.doubanId || "",
         createdAt: existing?.createdAt || now,
         updatedAt: now,
         origin: existing?.origin || "本地整理"
-      }, { links });
+      }, { links, downloads });
       if (existing) {
         resources = resources.map((item) => item.id === existing.id ? resource : item);
       } else {
@@ -506,9 +635,84 @@
     if (activeId === id && elements.detail.open) renderDetail(id);
   }
 
+  function applyDoubanCache(resource, force = false) {
+    const cached = resource.doubanId ? doubanCache[resource.doubanId] : null;
+    if (!cached) return false;
+    let changed = false;
+    const intro = clean(cached.intro);
+    if (intro && (force ? resource.descriptionSource !== "本地编辑" : !resource.description || resource.descriptionSource === "豆瓣")) {
+      resource.description = intro;
+      resource.descriptionSource = "豆瓣";
+      changed = true;
+    }
+    const rating = Number(cached.rating);
+    if (Number.isFinite(rating) && rating > 0 && (!resource.rating || resource.ratingSource === "豆瓣")) {
+      resource.rating = Math.min(10, rating);
+      resource.ratingCount = Math.max(0, Number(cached.ratingCount) || 0);
+      resource.ratingSource = "豆瓣";
+      changed = true;
+    }
+    return changed;
+  }
+
+  function saveDoubanCache() {
+    try {
+      localStorage.setItem(doubanCacheKey, JSON.stringify(doubanCache));
+    } catch {
+      return;
+    }
+  }
+
+  function loadDoubanDetail(resource) {
+    const subjectId = clean(resource.doubanId);
+    if (!/^\d+$/.test(subjectId)) return;
+    const cached = doubanCache[subjectId];
+    if (cached) {
+      if (applyDoubanCache(resource, resource.descriptionSource !== "本地编辑")) {
+        saveResources();
+        render();
+      }
+      return;
+    }
+    if (doubanRequests.has(subjectId) || (resource.descriptionSource === "本地编辑" && resource.ratingSource !== "豆瓣")) return;
+    doubanRequests.add(subjectId);
+    const callbackName = `dykDouban_${subjectId}_${Date.now().toString(36)}`;
+    const script = document.createElement("script");
+    let finished = false;
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      doubanRequests.delete(subjectId);
+      delete window[callbackName];
+      script.remove();
+    };
+    const timer = setTimeout(cleanup, 12000);
+    window[callbackName] = (payload) => {
+      cleanup();
+      if (!payload || typeof payload !== "object") return;
+      const intro = clean(payload.intro);
+      const rating = Number(payload.rating?.value);
+      const ratingCount = Math.max(0, Number(payload.rating?.count) || 0);
+      if (!intro && !(Number.isFinite(rating) && rating > 0)) return;
+      doubanCache[subjectId] = { intro, rating, ratingCount, updatedAt: new Date().toISOString() };
+      saveDoubanCache();
+      for (const item of resources) {
+        if (item.doubanId === subjectId) applyDoubanCache(item, true);
+      }
+      saveResources();
+      if (activeId === resource.id && elements.detail.open) renderDetail(resource.id);
+      else render();
+    };
+    script.onerror = cleanup;
+    script.src = `https://m.douban.com/rexxar/api/v2/subject/${subjectId}?callback=${callbackName}&referer=${encodeURIComponent(`https://m.douban.com/movie/subject/${subjectId}/`)}`;
+    document.head.append(script);
+  }
+
   function renderDetail(id) {
     const resource = resources.find((item) => item.id === id);
     if (!resource) return;
+    if (applyDoubanCache(resource)) saveResources();
     activeId = id;
     const hasPoster = Boolean(resource.poster);
     elements.detailImage.hidden = !hasPoster;
@@ -522,12 +726,20 @@
     elements.detailTypographic.textContent = resource.title;
     elements.detailSource.textContent = resource.source;
     elements.detailTitle.textContent = resource.title;
+    elements.detailRating.hidden = !resource.rating;
+    elements.detailRatingValue.textContent = resource.rating ? resource.rating.toFixed(1) : "";
+    elements.detailRatingLabel.textContent = resource.ratingSource || "评分";
+    elements.detailRatingCount.textContent = resource.ratingCount ? `${resource.ratingCount.toLocaleString("zh-CN")} 人评分` : "";
     elements.detailMeta.textContent = [resource.titleEn, resource.type, `更新于 ${formatDate(resource.updatedAt)}`].filter(Boolean).join(" · ");
     elements.detailTags.innerHTML = resource.tags.map((tag) => `<span>${escapeHtml(tag)}</span>`).join("");
     elements.detailDescription.textContent = resource.description || "暂无简介。";
     elements.detailLinksSection.hidden = resource.links.length === 0;
-    elements.detailEmptyLinks.hidden = resource.links.length !== 0;
+    elements.detailEmptyLinks.hidden = resource.links.length !== 0 || resource.downloads.length !== 0;
     elements.detailLinks.innerHTML = resource.links.map((link) =>
+      `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(link.label)}</span><svg class="icon"><use href="#icon-arrow"></use></svg></a>`
+    ).join("");
+    elements.detailDownloadsSection.hidden = resource.downloads.length === 0;
+    elements.detailDownloads.innerHTML = resource.downloads.map((link) =>
       `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(link.label)}</span><svg class="icon"><use href="#icon-arrow"></use></svg></a>`
     ).join("");
     elements.detailFavorite.setAttribute("aria-pressed", String(resource.favorite));
@@ -539,6 +751,7 @@
     renderDetail(id);
     elements.detail.showModal();
     syncBodyLock();
+    loadDoubanDetail(resources.find((item) => item.id === id));
   }
 
   function deleteResource(id) {
@@ -546,6 +759,7 @@
     if (!resource) return;
     if (!window.confirm(`确定删除《${resource.title}》吗？此操作只影响当前浏览器的资源库。`)) return;
     resources = resources.filter((item) => item.id !== id);
+    if (builtinById.has(id)) deletedBuiltinIds.add(id);
     if (!saveResources()) return;
     if (elements.detail.open) closeDialog(elements.detail);
     activeId = null;
@@ -561,10 +775,12 @@
     for (const resource of incoming) {
       const existing = byId.get(resource.id);
       if (existing) {
+        deletedBuiltinIds.delete(resource.id);
         if (!overwrite) continue;
         byId.set(resource.id, { ...resource, createdAt: existing.createdAt || resource.createdAt, updatedAt: new Date().toISOString() });
         updated++;
       } else {
+        deletedBuiltinIds.delete(resource.id);
         byId.set(resource.id, resource);
         added++;
       }
@@ -584,6 +800,7 @@
       return;
     }
     resources = [...fresh, ...resources];
+    for (const resource of fresh) deletedBuiltinIds.delete(resource.id);
     saveResources();
     render();
     showToast(`已从电影书架导入 ${fresh.length} 部影片。`);
@@ -616,11 +833,16 @@
       title,
       titleEn: item.title_en,
       type: item.resource_type || item.type || "未分类",
-      description: item.description,
+      description: item.description || item.overview || item.synopsis || item.intro,
       poster,
       source: "GoComicMosaic",
       tags: item.tags,
       links: normalizeExternalLinks(item.links, base),
+      downloads: normalizeExternalLinks(item.downloads || item.download_url || item.downloadUrl || item.download_links, base),
+      rating: item.rating ?? item.vote_average ?? item.score,
+      ratingCount: item.ratingCount ?? item.rating_count ?? item.vote_count,
+      ratingSource: item.ratingSource || item.rating_source || (item.douban_rating ? "豆瓣" : item.vote_average ? "TMDB" : item.rating || item.score ? "评分" : ""),
+      doubanId: item.doubanId || item.douban_id,
       origin: "GoComicMosaic"
     });
   }
@@ -635,7 +857,7 @@
     const genres = (Array.isArray(rawGenres) ? rawGenres : String(rawGenres || "").split(/[,，/|]/))
       .map((genre) => clean(typeof genre === "object" ? genre?.name : genre))
       .filter(Boolean);
-    const description = clean(item.overview || item.description || item.plot || item.synopsis || item.intro || item.summary || item["简介"]);
+    const description = clean(item.overview || item.description || item.plot || item.synopsis || item.intro || item.summary || item.full_description || item["简介"] || item["剧情简介"]);
     let rawPoster = item.poster || item.poster_path || item.cover || item.image || item.img || item["海报"] || "";
     if (Array.isArray(rawPoster)) rawPoster = rawPoster[0] || "";
     if (typeof rawPoster === "string" && rawPoster.startsWith("/")) {
@@ -655,6 +877,11 @@
       source: sourceName,
       tags: [...genres, year].filter(Boolean),
       links,
+      downloads: normalizeExternalLinks(item.downloads || item.download_url || item.downloadUrl || item.download_links || item.downloadLinks, base),
+      rating: item.rating ?? item.score ?? item.vote_average ?? item.douban_rating,
+      ratingCount: item.ratingCount ?? item.rating_count ?? item.vote_count,
+      ratingSource: item.ratingSource || item.rating_source || (item.douban_rating ? "豆瓣" : item.vote_average ? "TMDB" : item.rating || item.score ? "评分" : ""),
+      doubanId: item.doubanId || item.douban_id,
       origin: sourceName
     });
   }
@@ -901,6 +1128,7 @@
     const rows = elements.linkRows.querySelectorAll(".link-row");
     if (rows.length === 1) {
       rows[0].querySelectorAll("input").forEach((input) => { input.value = ""; });
+      rows[0].querySelector(".link-kind").value = "link";
     } else {
       button.closest(".link-row").remove();
     }
@@ -963,5 +1191,10 @@
     });
   }
 
+  let cachedResourcesChanged = false;
+  for (const resource of resources) {
+    if (applyDoubanCache(resource, resource.origin === "电影书架")) cachedResourcesChanged = true;
+  }
+  if (cachedResourcesChanged) saveResources();
   render();
 })();
