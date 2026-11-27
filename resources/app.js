@@ -1214,29 +1214,43 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127l";
+    const version = "20261127m";
     let catalogErrorShown = false;
+    let nextIndex = 0;
     const scheduleRefresh = () => {
       window.clearTimeout(extraCatalogRefreshTimer);
       extraCatalogRefreshTimer = window.setTimeout(refreshExtraCatalog, 150);
     };
-    const loadChunk = (index, attempt = 0) => {
+    const loadChunk = (index, attempt = 0) => new Promise((resolve) => {
       const script = document.createElement("script");
       script.src = `catalog-${index}.js?v=${version}${attempt ? `&retry=${attempt}` : ""}`;
-      script.onload = scheduleRefresh;
+      script.onload = () => {
+        scheduleRefresh();
+        resolve();
+      };
       script.onerror = () => {
         script.remove();
         if (attempt < 2) {
-          window.setTimeout(() => loadChunk(index, attempt + 1), 400 * (attempt + 1));
-        } else if (!catalogErrorShown) {
-          catalogErrorShown = true;
-          showToast("部分资源加载失败，请刷新页面重试。", true);
+          window.setTimeout(() => loadChunk(index, attempt + 1).then(resolve), 400 * (attempt + 1));
+        } else {
+          if (!catalogErrorShown) {
+            catalogErrorShown = true;
+            showToast("部分资源加载失败，请刷新页面重试。", true);
+          }
+          scheduleRefresh();
+          resolve();
         }
-        scheduleRefresh();
       };
       document.head.appendChild(script);
+    });
+    const worker = async () => {
+      while (nextIndex < 8) {
+        const index = nextIndex;
+        nextIndex += 1;
+        await loadChunk(index);
+      }
     };
-    for (let index = 0; index < 8; index += 1) loadChunk(index);
+    Promise.all(Array.from({ length: 3 }, worker));
   }
 
   loadExtraCatalog();
