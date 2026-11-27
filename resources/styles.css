@@ -235,6 +235,7 @@ h1 em { color: var(--accent-light); font-style: normal; }
 .detail-description { margin: 18px 0 0; color: var(--muted); font-size: 12px; line-height: 1.9; white-space: pre-wrap; }
 .detail-links-section { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
 .detail-links-section h3 { margin: 0 0 10px; color: var(--ink); font-size: 12px; }
+.detail-downloads-note { margin: -2px 0 10px; color: var(--faint); font-size: 10px; line-height: 1.7; }
 .detail-links { display: grid; gap: 7px; }
 .detail-links a { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 39px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: rgba(255, 255, 255, 0.025); color: var(--muted); font-size: 11px; }
 .detail-links a:hover { border-color: rgba(239, 198, 139, 0.42); color: var(--accent-light); }

@@ -78,6 +78,7 @@
     detailDownloadsSection: document.getElementById("detail-downloads-section"),
     detailDownloads: document.getElementById("detail-downloads"),
     detailDownloadsEmpty: document.getElementById("detail-downloads-empty"),
+    detailDownloadsNote: document.getElementById("detail-downloads-note"),
     detailEmptyLinks: document.getElementById("detail-empty-links"),
     detailFavorite: document.getElementById("detail-favorite"),
     api: document.getElementById("api-dialog"),
@@ -98,6 +99,10 @@
 
   function clean(value) {
     return String(value ?? "").replace(/\s+/g, " ").trim();
+  }
+
+  function titleKey(value) {
+    return clean(value).toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "");
   }
 
   function escapeHtml(value) {
@@ -153,6 +158,59 @@
       return text.replace(/\/assets\/posters\/[^/]+$/i, `/assets/posters/thumbs/${file}`);
     }
     return text.replace("https://image.tmdb.org/t/p/w500/", "https://image.tmdb.org/t/p/w342/");
+  }
+
+  const OPEN_MOVIE_SOURCES = {
+    bigbuckbunny: { project: "https://studio.blender.org/projects/big-buck-bunny/", download: "https://download.blender.org/demo/movies/BBB/" },
+    sintel: { project: "https://studio.blender.org/projects/sintel/", download: "https://download.blender.org/demo/movies/Sintel/" },
+    tearsofsteel: { project: "https://studio.blender.org/projects/tears-of-steel/", download: "https://download.blender.org/demo/movies/ToS/" },
+    cosmoslaundromat: { project: "https://studio.blender.org/projects/cosmos-laundromat/", download: "https://download.blender.org/demo/movies/CosmosLaundromat/" },
+    spring: { project: "https://studio.blender.org/projects/spring/", download: "https://download.blender.org/demo/movies/Spring/" },
+    charge: { project: "https://studio.blender.org/projects/charge/", download: "https://download.blender.org/demo/movies/Charge/" },
+    elephantsdream: { project: "https://studio.blender.org/projects/elephants-dream/", download: "https://download.blender.org/demo/movies/ED/" },
+    agent327: { project: "https://studio.blender.org/projects/agent-327/", download: "https://download.blender.org/demo/movies/Agent327/" },
+    spritefright: { project: "https://studio.blender.org/projects/sprite-fright/", download: "https://download.blender.org/demo/movies/SpriteFright/" },
+    coffeerun: { project: "https://studio.blender.org/projects/coffee-run/", download: "https://download.blender.org/demo/movies/CoffeeRun/" }
+  };
+
+  function isArchiveUrl(value) {
+    try {
+      return ["archive.org", "www.archive.org", "web.archive.org"].includes(new URL(value).hostname.toLowerCase());
+    } catch {
+      return false;
+    }
+  }
+
+  function officialSourceLinks(title, titleEn) {
+    const zh = encodeURIComponent(title);
+    const query = encodeURIComponent(titleEn || title);
+    return [
+      { label: "腾讯视频 · 正版平台", url: `https://v.qq.com/x/search/?q=${zh}` },
+      { label: "爱奇艺 · 正版平台", url: `https://so.iqiyi.com/so/q_${zh}` },
+      { label: "优酷 · 正版平台", url: `https://so.youku.com/search_video/q_${zh}` },
+      { label: "哔哩哔哩 · 正版平台", url: `https://search.bilibili.com/all?keyword=${zh}` },
+      { label: "1905电影网 · 正版检索", url: `https://www.1905.com/search/?q=${zh}` },
+      { label: "JustWatch · 正版聚合", url: `https://www.justwatch.com/us/search?q=${query}` }
+    ];
+  }
+
+  function publicDomainSourceLinks(title, titleEn) {
+    const query = encodeURIComponent(titleEn || title);
+    return [
+      { label: "PublicDomainMovies · 公共领域电影", url: `https://publicdomainmovie.net/search/node?keys=${query}` },
+      { label: "Wikimedia Commons · 公共领域 / CC 视频", url: `https://commons.wikimedia.org/w/index.php?search=${query}&title=Special:MediaSearch&type=video` },
+      { label: "Public Domain Torrents · 公共领域种子", url: "https://publicdomaintorrents.info/" }
+    ];
+  }
+
+  function applyDownloadPolicy(resource) {
+    const year = Number(resource.tags.find((tag) => /^\d{4}$/.test(tag))) || 0;
+    const publicDomainCandidate = year > 0 && year <= 1930;
+    if (publicDomainCandidate) return resource;
+    return {
+      ...resource,
+      downloads: resource.downloads.filter((link) => !isArchiveUrl(link.url))
+    };
   }
 
   function normalizeTags(value) {
@@ -240,6 +298,7 @@
       tags: normalizeTags(input.tags),
       links,
       downloads: options.downloads || normalizeSimpleLinks(input.downloads || input.download_links || input.downloadLinks || input.download_url || input.downloadUrl),
+      downloadNotice: clean(input.downloadNotice || input.download_notice),
       rating,
       ratingCount,
       ratingSource: clean(input.ratingSource || input.rating_source) || (rating ? "评分" : ""),
@@ -260,19 +319,23 @@
       { items: window.CLASSICS, prefix: "classic" },
       { items: window.SHOWING, prefix: "showing" }
     ];
-    const titleKey = (value) => clean(value).toLocaleLowerCase("zh-CN").replace(/[^\p{L}\p{N}]+/gu, "");
+    const mergeLinks = (incoming, target) => {
+      for (const link of incoming) {
+        if (!target.some((item) => item.url === link.url)) target.push({ ...link });
+      }
+    };
     const movieAliases = [];
     const movies = collections.flatMap(({ items, prefix }) => {
       if (!Array.isArray(items)) return [];
       return items.map((movie) => {
         const links = [];
-        if (movie.watchUrl) {
-          const watchUrl = movie.watchUrl.startsWith("today/") ? `../${movie.watchUrl}` : movie.watchUrl;
-          links.push({ label: movie.watchLabel || "在线观看", url: watchUrl });
-        }
+        let watchUrl = movie.watchUrl || "";
+        if (watchUrl.startsWith("today/")) watchUrl = `../${watchUrl}`;
+        if (watchUrl) links.push({ label: movie.watchLabel || "在线观看", url: watchUrl });
         if (movie.secondaryUrl) {
           links.push({ label: movie.secondaryLabel || "更多信息", url: movie.secondaryUrl });
         }
+        const year = String(movie.year || (String(movie.meta || "").match(/\b(?:19|20)\d{2}\b/) || [])[0] || "");
         const resource = normalizeResource({
           id: `${prefix}-${movie.id}`,
           title: movie.title,
@@ -281,7 +344,7 @@
           description: movie.synopsis,
           poster: movie.poster ? `../${movie.poster}` : "",
           source: movie.source || "电影书架",
-          tags: [...(Array.isArray(movie.tags) ? movie.tags : []), movie.source].filter(Boolean),
+          tags: [...(Array.isArray(movie.tags) ? movie.tags : []), movie.source, year].filter(Boolean),
           links: normalizeSimpleLinks(links),
           downloads: normalizeSimpleLinks(movie.downloads || movie.downloadUrls),
           rating: movie.rating,
@@ -291,7 +354,28 @@
           origin: "电影书架"
         });
         if (resource) {
-          const year = String(movie.year || "");
+          const open = OPEN_MOVIE_SOURCES[titleKey(movie.title)] || OPEN_MOVIE_SOURCES[titleKey(movie.originalTitle || movie.titleEn)];
+          const sourceText = clean(movie.source);
+          if (open) {
+            mergeLinks([
+              { label: "Blender Studio · 官方下载", url: open.project },
+              { label: "Blender · 官方下载目录", url: open.download }
+            ], resource.downloads);
+            resource.downloadNotice = "Blender 开放电影采用 CC BY 许可，可免费下载；请保留署名。";
+          } else if (sourceText.includes("1905") && watchUrl) {
+            mergeLinks([{ label: "1905电影网 · 官方免费片源", url: watchUrl }], resource.downloads);
+            resource.downloadNotice = "1905 正版免费片源；是否提供下载以原页面为准。";
+          } else if (prefix !== "showing") {
+            if (year && Number(year) <= 1930) {
+              mergeLinks(publicDomainSourceLinks(movie.title, movie.originalTitle || movie.titleEn), resource.downloads);
+              resource.downloadNotice = "公共领域候选来源；下载前请查看原页的版权与许可说明。";
+            } else {
+              mergeLinks(officialSourceLinks(movie.title, movie.originalTitle || movie.titleEn), resource.downloads);
+              resource.downloadNotice = "正版平台需购买、租赁或会员；购买或租赁后可下载，离线下载以平台 App 为准。";
+            }
+          } else if (!resource.downloads.length) {
+            resource.downloadNotice = "影片仍在上映或尚未发行数字版，暂无正版下载来源。";
+          }
           for (const alias of [movie.title, movie.originalTitle, movie.titleEn]) {
             const key = titleKey(alias);
             if (key) movieAliases.push({ key, year, resource });
@@ -300,11 +384,6 @@
         return resource;
       }).filter(Boolean);
     });
-    const mergeLinks = (incoming, target) => {
-      for (const link of incoming) {
-        if (!target.some((item) => item.url === link.url)) target.push({ ...link });
-      }
-    };
     for (const resource of extra) {
       const year = resource.tags.find((tag) => /^\d{4}$/.test(tag)) || "";
       const keys = [resource.title, resource.titleEn].map(titleKey).filter(Boolean);
@@ -314,6 +393,7 @@
       mergeLinks(resource.links, match.resource.links);
       mergeLinks(resource.downloads, match.resource.downloads);
     }
+    for (const resource of movies) resource.downloads = applyDownloadPolicy(resource).downloads;
     return [...extra, ...movies];
   }
 
@@ -400,10 +480,11 @@
           if (!override) return copyResource(resource);
           const links = mergeLinkLists(resource.links, override.links);
           const downloads = mergeLinkLists(resource.downloads, override.downloads);
-          return normalizeResource(
-            { ...resource, ...override, links, downloads },
+          const merged = normalizeResource(
+            { ...resource, ...override, links, downloads, downloadNotice: override.downloadNotice || resource.downloadNotice },
             { links, downloads }
           );
+          return applyDownloadPolicy(merged);
         });
       localStorage.setItem(catalogMigrationKey, "2");
       localStorage.setItem(storageKey, JSON.stringify(stored));
@@ -825,6 +906,8 @@
     ).join("");
     elements.detailDownloadsSection.hidden = false;
     elements.detailDownloadsEmpty.hidden = resource.downloads.length !== 0;
+    elements.detailDownloadsNote.hidden = !resource.downloadNotice;
+    elements.detailDownloadsNote.textContent = resource.downloadNotice || "";
     elements.detailDownloads.innerHTML = resource.downloads.map((link) =>
       `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"><span>${escapeHtml(link.label)}</span><svg class="icon"><use href="#icon-arrow"></use></svg></a>`
     ).join("");
@@ -1297,7 +1380,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127q";
+    const version = "20261127r";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
