@@ -3,7 +3,8 @@
   "use strict";
 
   const STORAGE_KEY = "dyk-tvbox-sources-v1";
-  const VERSION = "20261127y";
+  const VERSION = "20261127za";
+  const HLS_VERSION = "20261127y";
   const ALLOWED_SITE_TYPES = new Set([1, 3, 4]);
   const TYPE_LABELS = { 0: "Spider / Jar", 1: "网页规则", 2: "未知", 3: "苹果 CMS", 4: "JSON 接口" };
   const PRESET = {
@@ -42,11 +43,13 @@
     activeLine: 0,
     detailItem: null,
     detailSite: null,
-    hls: null
+    hls: null,
+    playToken: 0
   };
 
   const elements = {};
   const resultCache = new Map();
+  let hlsLoader = null;
 
   function clean(value) {
     return String(value ?? "").replace(/\s+/g, " ").trim();
@@ -540,6 +543,7 @@
     if (!item) return;
     const site = getSites().find((entry) => entry.key === item.siteKey);
     if (!site) return;
+    warmPlayer();
     try {
       const detail = await getDetail(site, item.vod_id);
       state.detailItem = detail;
@@ -621,14 +625,23 @@
 
   async function ensureHls() {
     if (window.Hls) return window.Hls;
-    await new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = `hls.min.js?v=${VERSION}`;
-      script.onload = resolve;
-      script.onerror = () => reject(new Error("播放器组件加载失败"));
-      document.head.append(script);
-    });
-    return window.Hls;
+    if (!hlsLoader) {
+      hlsLoader = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = `hls.min.js?v=${HLS_VERSION}`;
+        script.onload = () => window.Hls ? resolve(window.Hls) : reject(new Error("播放器组件加载失败"));
+        script.onerror = () => reject(new Error("播放器组件加载失败"));
+        document.head.append(script);
+      }).catch((error) => {
+        hlsLoader = null;
+        throw error;
+      });
+    }
+    return hlsLoader;
+  }
+
+  function warmPlayer() {
+    ensureHls().catch(() => {});
   }
 
   async function resolvePlayableUrl(url) {
@@ -646,27 +659,55 @@
       toast("该地址不是浏览器可播放的 HTTP(S) 视频。", true);
       return;
     }
+    const token = ++state.playToken;
     if (state.hls) {
       state.hls.destroy();
       state.hls = null;
     }
+    video.pause();
+    video.onloadedmetadata = null;
+    video.onerror = null;
+    video.removeAttribute("src");
+    video.load();
     video.hidden = false;
     video.poster = "";
     status.textContent = label ? `正在加载：${label}` : "正在加载视频…";
+    let slowTimer = 0;
+    const isCurrent = () => token === state.playToken;
+    video.onloadedmetadata = () => {
+      if (!isCurrent()) return;
+      window.clearTimeout(slowTimer);
+      status.textContent = "";
+    };
+    video.onerror = () => {
+      if (!isCurrent()) return;
+      window.clearTimeout(slowTimer);
+      status.textContent = "视频加载失败，可尝试其他线路或打开原地址。";
+    };
+    slowTimer = window.setTimeout(() => {
+      if (isCurrent() && video.readyState < 1) status.textContent = "视频加载较慢，可切换线路或打开原地址。";
+    }, 30000);
     try {
       target = await resolvePlayableUrl(target);
+      if (!isCurrent()) return;
       if (/\.m3u8(?:$|[?#])/i.test(target)) {
         const Hls = await ensureHls();
+        if (!isCurrent()) return;
         if (Hls.isSupported()) {
           state.hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-          state.hls.loadSource(target);
           state.hls.attachMedia(video);
+          state.hls.loadSource(target);
           state.hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            if (!isCurrent()) return;
             status.textContent = "";
             video.play().catch(() => {});
           });
           state.hls.on(Hls.Events.ERROR, (_event, data) => {
-            if (data.fatal) status.textContent = "视频加载失败，可尝试打开原地址。";
+            if (!isCurrent()) return;
+            if (data.fatal) {
+              window.clearTimeout(slowTimer);
+              status.textContent = "视频加载失败，可尝试其他线路或打开原地址。";
+            }
           });
         } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
           video.src = target;
@@ -676,15 +717,12 @@
         }
       } else {
         video.src = target;
-        video.onloadedmetadata = () => {
-          status.textContent = "";
-          video.play().catch(() => {});
-        };
-        video.onerror = () => {
-          status.textContent = "视频加载失败，可尝试打开原地址。";
-        };
+        video.load();
+        video.play().catch(() => {});
       }
     } catch (error) {
+      if (!isCurrent()) return;
+      window.clearTimeout(slowTimer);
       status.textContent = error.message || "视频加载失败";
     }
   }
@@ -925,6 +963,7 @@
       toast("订阅里没有直播源。", true);
       return;
     }
+    warmPlayer();
     elements.liveSource.innerHTML = lives.map((live, index) => `<option value="${index}">${escapeHtml(live.name)}</option>`).join("");
     elements.liveDialog.showModal();
     document.body.classList.add("modal-open");
