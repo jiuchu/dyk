@@ -145,6 +145,16 @@
     return safeHttpUrl(text);
   }
 
+  function posterThumb(value) {
+    const text = normalizePoster(value);
+    if (!text) return "";
+    if (text.includes("/assets/posters/") && !text.includes("/assets/posters/thumbs/")) {
+      const file = text.split("/").pop().replace(/\.(?:jpe?g|png|webp)$/i, ".webp");
+      return text.replace(/\/assets\/posters\/[^/]+$/i, `/assets/posters/thumbs/${file}`);
+    }
+    return text.replace("https://image.tmdb.org/t/p/w500/", "https://image.tmdb.org/t/p/w342/");
+  }
+
   function normalizeTags(value) {
     if (Array.isArray(value)) return [...new Set(value.map(clean).filter(Boolean))].slice(0, 30);
     return [...new Set(String(value ?? "").split(/[,，]/).map(clean).filter(Boolean))].slice(0, 30);
@@ -322,6 +332,14 @@
     };
   }
 
+  function mergeLinkLists(base, extra) {
+    const merged = base.map((link) => ({ ...link }));
+    for (const link of extra || []) {
+      if (!merged.some((item) => item.url === link.url)) merged.push({ ...link });
+    }
+    return merged;
+  }
+
   function loadResources() {
     try {
       builtinResources = resourcesFromMovies();
@@ -377,9 +395,16 @@
       deletedBuiltinIds = new Set(Array.isArray(stored.deleted) ? stored.deleted : []);
       const merged = builtinResources
         .filter((resource) => !deletedBuiltinIds.has(resource.id))
-        .map((resource) => copyResource(overrides[resource.id]
-          ? normalizeResource({ ...resource, ...overrides[resource.id] }, { links: normalizeSimpleLinks(overrides[resource.id].links || resource.links) })
-          : resource));
+        .map((resource) => {
+          const override = overrides[resource.id];
+          if (!override) return copyResource(resource);
+          const links = mergeLinkLists(resource.links, override.links);
+          const downloads = mergeLinkLists(resource.downloads, override.downloads);
+          return normalizeResource(
+            { ...resource, ...override, links, downloads },
+            { links, downloads }
+          );
+        });
       localStorage.setItem(catalogMigrationKey, "2");
       localStorage.setItem(storageKey, JSON.stringify(stored));
       return [...custom, ...merged];
@@ -503,12 +528,14 @@
     elements.clearSearch.hidden = !state.query;
     elements.reset.hidden = !state.query && state.type === "all" && state.source === "all" && !state.favoritesOnly;
     elements.favoriteFilter.setAttribute("aria-pressed", String(state.favoritesOnly));
-    elements.grid.innerHTML = visible.map((resource) => {
+    elements.grid.innerHTML = visible.map((resource, index) => {
       const hasPoster = Boolean(resource.poster);
+      const poster = posterThumb(resource.poster);
+      const eager = index < 18;
       return `<article class="resource-card">
         <button class="resource-case" type="button" data-open="${escapeHtml(resource.id)}" aria-label="查看《${escapeHtml(resource.title)}》详情">
           <div class="resource-cover">
-            ${hasPoster ? `<img src="${escapeHtml(resource.poster)}" alt="《${escapeHtml(resource.title)}》海报" loading="lazy" decoding="async" referrerpolicy="no-referrer">` : ""}
+            ${hasPoster ? `<img src="${escapeHtml(poster)}" alt="《${escapeHtml(resource.title)}》海报" width="400" height="600" loading="${eager ? "eager" : "lazy"}" ${eager && index < 6 ? 'fetchpriority="high"' : ""} decoding="async" referrerpolicy="no-referrer">` : ""}
             <div class="resource-typographic" ${hasPoster ? "hidden" : ""}>${escapeHtml(resource.title)}</div>
             <span class="resource-spine">${escapeHtml(resource.type)}</span>
             ${resource.rating ? `<span class="resource-rating">${escapeHtml(resource.ratingSource || "评分")} ${resource.rating.toFixed(1)}</span>` : ""}
@@ -525,6 +552,7 @@
         </div>
       </article>`;
     }).join("");
+    hydratePosterImages();
     elements.loadMore.hidden = list.length <= state.limit;
     elements.loadMore.textContent = `加载更多（还有 ${Math.max(0, list.length - state.limit)} 条）`;
     elements.empty.hidden = list.length !== 0;
@@ -532,6 +560,23 @@
       elements.emptyMessage.textContent = "新增一条资源，或从电影书架导入影片。";
     } else if (!list.length) {
       elements.emptyMessage.textContent = "没有符合当前筛选条件的资源，换个关键词或清除筛选试试。";
+    }
+  }
+
+  function hydratePosterImages() {
+    for (const image of elements.grid.querySelectorAll("img")) {
+      const reveal = () => image.classList.add("is-loaded");
+      const fallback = () => {
+        image.hidden = true;
+        const typographic = image.parentElement.querySelector(".resource-typographic");
+        if (typographic) typographic.hidden = false;
+      };
+      image.addEventListener("load", reveal, { once: true });
+      image.addEventListener("error", fallback, { once: true });
+      if (image.complete) {
+        if (image.naturalWidth > 0) reveal();
+        else fallback();
+      }
     }
   }
 
@@ -1240,7 +1285,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127n";
+    const version = "20261127o";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
