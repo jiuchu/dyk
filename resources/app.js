@@ -2,13 +2,14 @@
   "use strict";
 
   const storageKey = "dyk-resource-library-v1";
+  const pageSize = 48;
   const catalogMigrationKey = "dyk-resource-library-catalog-v6";
   const doubanCacheKey = "dyk-resource-douban-v1";
   const apiDefault = "https://dm.xueximeng.com/api/resources/public";
   let builtinResources = [];
   let builtinById = new Map();
   let deletedBuiltinIds = new Set();
-  let resources = loadResources();
+  let resources = [];
   let editingId = null;
   let activeId = null;
   let toastTimer;
@@ -19,9 +20,10 @@
     source: "all",
     sort: "updated",
     favoritesOnly: false,
-    limit: 120
+    limit: pageSize
   };
   let renderKey = "";
+  let extraCatalogLoading = true;
   const doubanRequests = new Set();
   let doubanCache = {};
   try {
@@ -322,7 +324,8 @@
         if (!target.some((item) => item.url === link.url)) target.push({ ...link });
       }
     };
-    const movieAliases = [];
+    const movieAliasesByKey = new Map();
+    const movieAliasesByKeyAndYear = new Map();
     const movies = collections.flatMap(({ items, prefix }) => {
       if (!Array.isArray(items)) return [];
       return items.map((movie) => {
@@ -391,7 +394,10 @@
           }
           for (const alias of [movie.title, movie.originalTitle, movie.titleEn]) {
             const key = titleKey(alias);
-            if (key) movieAliases.push({ key, year, resource });
+            if (!key) continue;
+            if (!movieAliasesByKey.has(key)) movieAliasesByKey.set(key, resource);
+            const keyAndYear = `${year}\n${key}`;
+            if (!movieAliasesByKeyAndYear.has(keyAndYear)) movieAliasesByKeyAndYear.set(keyAndYear, resource);
           }
         }
         return resource;
@@ -400,11 +406,11 @@
     for (const resource of extra) {
       const year = resource.tags.find((tag) => /^\d{4}$/.test(tag)) || "";
       const keys = [resource.title, resource.titleEn].map(titleKey).filter(Boolean);
-      const match = movieAliases.find((alias) => alias.year === year && keys.includes(alias.key))
-        || movieAliases.find((alias) => keys.includes(alias.key));
+      const match = keys.map((key) => movieAliasesByKeyAndYear.get(`${year}\n${key}`)).find(Boolean)
+        || keys.map((key) => movieAliasesByKey.get(key)).find(Boolean);
       if (!match) continue;
-      mergeLinks(resource.links, match.resource.links);
-      mergeLinks(resource.downloads, match.resource.downloads);
+      mergeLinks(resource.links, match.links);
+      mergeLinks(resource.downloads, match.downloads);
     }
     return [...extra, ...movies];
   }
@@ -501,7 +507,7 @@
       localStorage.setItem(catalogMigrationKey, "2");
       localStorage.setItem(storageKey, JSON.stringify(stored));
       return [...custom, ...merged];
-    } catch {
+    } catch (error) {
       return builtinResources.map(copyResource);
     }
   }
@@ -609,7 +615,7 @@
   function render() {
     const nextRenderKey = `${state.query}\n${state.type}\n${state.source}\n${state.sort}\n${state.favoritesOnly}`;
     if (nextRenderKey !== renderKey) {
-      state.limit = 120;
+      state.limit = pageSize;
       renderKey = nextRenderKey;
     }
     renderTypeFilter();
@@ -617,7 +623,7 @@
     renderStats();
     const list = filteredResources();
     const visible = list.slice(0, state.limit);
-    elements.summary.textContent = `显示 ${visible.length} / ${resources.length} 条资源`;
+    elements.summary.textContent = `显示 ${visible.length} / ${resources.length} 条资源${extraCatalogLoading ? " · 正在加载扩展资源…" : ""}`;
     elements.clearSearch.hidden = !state.query;
     elements.reset.hidden = !state.query && state.type === "all" && state.source === "all" && !state.favoritesOnly;
     elements.favoriteFilter.setAttribute("aria-pressed", String(state.favoritesOnly));
@@ -1291,7 +1297,7 @@
   });
   elements.reset.addEventListener("click", resetFilters);
   elements.loadMore.addEventListener("click", () => {
-    state.limit += 120;
+    state.limit += pageSize;
     render();
   });
   document.getElementById("add-resource").addEventListener("click", () => openEditor());
@@ -1381,6 +1387,7 @@
     });
   }
 
+  resources = loadResources();
   let cachedResourcesChanged = false;
   for (const resource of resources) {
     if (applyDoubanCache(resource, resource.origin === "电影书架")) cachedResourcesChanged = true;
@@ -1388,7 +1395,6 @@
   if (cachedResourcesChanged) saveResources();
   render();
 
-  let extraCatalogRefreshTimer = 0;
   function refreshExtraCatalog() {
     resources = loadResources();
     let changed = false;
@@ -1401,13 +1407,9 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127x";
+    const version = "20261127z";
     let catalogErrorShown = false;
     let nextIndex = 0;
-    const scheduleRefresh = () => {
-      window.clearTimeout(extraCatalogRefreshTimer);
-      extraCatalogRefreshTimer = window.setTimeout(refreshExtraCatalog, 150);
-    };
     const loadChunk = (index, attempt = 0) => new Promise((resolve) => {
       const before = window.EXTRA_RESOURCES.length;
       const script = document.createElement("script");
@@ -1426,7 +1428,6 @@
             catalogErrorShown = true;
             showToast("部分资源加载失败，请刷新页面重试。", true);
           }
-          scheduleRefresh();
           resolve();
         }
       };
@@ -1437,7 +1438,6 @@
         else {
           settled = true;
           window.clearTimeout(timer);
-          scheduleRefresh();
           resolve();
         }
       };
@@ -1451,7 +1451,10 @@
         await loadChunk(index);
       }
     };
-    Promise.all(Array.from({ length: 3 }, worker));
+    Promise.all(Array.from({ length: 3 }, worker)).then(() => {
+      extraCatalogLoading = false;
+      refreshExtraCatalog();
+    });
   }
 
   loadExtraCatalog();
