@@ -1321,6 +1321,15 @@
     elements.github.showModal();
     syncBodyLock();
   });
+  document.getElementById("open-tvbox-sources").addEventListener("click", () => {
+    document.getElementById("sources").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  window.addEventListener("dyk:save-resource", (event) => {
+    const resource = event.detail;
+    if (!resource?.title) return;
+    const result = mergeResources([normalizeResource(resource, { links: normalizeSimpleLinks(resource.links) })].filter(Boolean));
+    showToast(`已保存到资源库：${result.added ? "新增" : "更新"} ${result.added + result.updated} 条。`);
+  });
   document.getElementById("github-close").addEventListener("click", () => closeDialog(elements.github));
   document.getElementById("github-cancel").addEventListener("click", () => closeDialog(elements.github));
   elements.githubForm.addEventListener("submit", importFromGithub);
@@ -1378,7 +1387,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127v";
+    const version = "20261127w";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {

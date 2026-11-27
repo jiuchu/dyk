@@ -244,6 +244,67 @@ h1 em { color: var(--accent-light); font-style: normal; }
 .detail-actions { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
 .detail-note { margin: 14px 0 0; color: var(--faint); font-size: 9px; line-height: 1.7; }
 
+.tvbox-section { padding: 12px 0 54px; scroll-margin-top: 24px; }
+.tvbox-section-intro { max-width: 760px; margin: 10px 0 0; color: var(--faint); font-size: 12px; line-height: 1.8; }
+.tvbox-toolbar { display: flex; align-items: center; gap: 14px; padding: 14px; }
+.tvbox-toolbar-actions { display: flex; gap: 9px; }
+.tvbox-category-panel { display: flex; align-items: start; gap: 14px; margin-top: 12px; padding: 14px; }
+.tvbox-category-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+.tvbox-category-chip, .tvbox-line-button, .tvbox-episode-button { min-height: 34px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 5px; background: rgba(255, 255, 255, 0.025); color: var(--muted); cursor: pointer; font-size: 10px; }
+.tvbox-category-chip:hover, .tvbox-line-button:hover, .tvbox-episode-button:hover { border-color: rgba(239, 198, 139, 0.42); color: var(--accent-light); }
+.tvbox-source-heading { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: 26px 0 12px; }
+.tvbox-source-heading > div { display: flex; align-items: baseline; gap: 12px; }
+.tvbox-source-heading strong { font-family: var(--serif); font-size: 18px; }
+.tvbox-source-heading span { color: var(--faint); font-size: 10px; }
+.tvbox-source-list { display: grid; gap: 9px; }
+.tvbox-source-card { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 16px; border: 1px solid var(--line); border-radius: 8px; background: rgba(29, 26, 23, 0.58); }
+.tvbox-source-card.is-disabled { opacity: 0.55; }
+.tvbox-source-main { min-width: 0; }
+.tvbox-source-title { display: flex; align-items: center; gap: 9px; }
+.tvbox-source-title strong { overflow: hidden; font-family: var(--serif); font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.tvbox-source-title span { flex: 0 0 auto; padding: 3px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--faint); font-size: 8px; }
+.tvbox-source-main p { margin: 6px 0 0; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tvbox-source-main small { display: block; margin-top: 5px; color: var(--faint); font-size: 9px; }
+.tvbox-source-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; }
+.tvbox-mini-button, .tvbox-switch { min-height: 30px; padding: 0 9px; border: 1px solid var(--line-strong); border-radius: 5px; background: transparent; color: var(--muted); cursor: pointer; font-size: 9px; }
+.tvbox-mini-button:hover, .tvbox-switch:hover { color: var(--accent-light); border-color: rgba(239, 198, 139, 0.42); }
+.tvbox-mini-button.is-danger { color: var(--danger); }
+.tvbox-switch[aria-pressed="true"] { border-color: rgba(143, 191, 134, 0.35); color: #a9d49f; }
+.tvbox-empty, .tvbox-inline-empty { margin: 0; padding: 18px; color: var(--faint); font-size: 11px; line-height: 1.7; }
+.tvbox-results { margin-top: 28px; }
+.tvbox-results-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.tvbox-results-heading strong { font-family: var(--serif); font-size: 20px; }
+.tvbox-results-heading span { color: var(--faint); font-size: 10px; }
+.tvbox-search-grid { display: grid; gap: 22px; }
+.tvbox-result-group { padding: 16px; border: 1px solid var(--line); border-radius: 9px; background: rgba(29, 26, 23, 0.46); }
+.tvbox-result-group > header { display: flex; align-items: center; gap: 8px; margin-bottom: 13px; }
+.tvbox-result-group > header strong { font-family: var(--serif); font-size: 14px; }
+.tvbox-result-group > header small { color: var(--faint); font-size: 9px; }
+.tvbox-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); }
+.tvbox-status-dot.is-ok { background: #8fbf86; }
+.tvbox-status-dot.is-bad { background: var(--danger); }
+.tvbox-result-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px 12px; }
+.tvbox-result-card { min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer; text-align: left; }
+.tvbox-result-poster { position: relative; aspect-ratio: 2 / 3; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 5px; background: linear-gradient(145deg, #30271f, #171411); }
+.tvbox-result-poster img { width: 100%; height: 100%; object-fit: cover; }
+.tvbox-result-poster span { position: absolute; right: 5px; bottom: 5px; left: 5px; overflow: hidden; padding: 4px 5px; border-radius: 3px; background: rgba(13, 12, 11, 0.82); color: var(--accent-light); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.tvbox-result-card > strong { display: block; margin-top: 7px; overflow: hidden; font-family: var(--serif); font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tvbox-result-card > small { display: block; margin-top: 4px; overflow: hidden; color: var(--faint); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.tvbox-line-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.tvbox-line-button.is-active { border-color: rgba(239, 198, 139, 0.55); background: rgba(239, 198, 139, 0.1); color: var(--accent-light); }
+.tvbox-episodes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; max-height: 220px; overflow: auto; }
+.tvbox-video { width: 100%; max-height: 420px; border: 1px solid var(--line-strong); border-radius: 7px; background: #000; }
+.tvbox-live-dialog { width: min(980px, calc(100% - 32px)); }
+.tvbox-live-shell { display: block !important; }
+.tvbox-live-heading { padding-right: 40px; }
+.tvbox-live-heading h2 { margin: 7px 0; font-family: var(--serif); font-size: 28px; }
+.tvbox-live-heading p:last-child { margin: 0; color: var(--faint); font-size: 10px; }
+.tvbox-live-controls { display: grid; grid-template-columns: 180px 180px minmax(180px, 1fr); gap: 10px; margin-top: 18px; }
+.tvbox-live-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; max-height: 360px; margin-top: 14px; overflow: auto; }
+.tvbox-live-channel { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 38px; padding: 0 10px; border: 1px solid var(--line); border-radius: 5px; background: rgba(255, 255, 255, 0.02); color: var(--muted); cursor: pointer; font-size: 10px; text-align: left; }
+.tvbox-live-channel:hover { border-color: rgba(239, 198, 139, 0.42); color: var(--accent-light); }
+.tvbox-live-channel small { flex: 0 0 auto; color: var(--faint); font-size: 8px; }
+
 .api-dialog { width: min(600px, calc(100% - 32px)); }
 .api-shell .field { margin-top: 22px; }
 .api-hint { margin: 10px 0 0 !important; color: var(--faint); font-size: 10px !important; }
@@ -257,6 +318,7 @@ h1 em { color: var(--accent-light); font-style: normal; }
   .header-note { display: none; }
   .resource-hero { gap: 36px; }
   .resource-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .tvbox-result-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .toolbar-main { align-items: stretch; flex-direction: column; }
   .filter-row { justify-content: flex-end; }
 }
@@ -278,6 +340,16 @@ h1 em { color: var(--accent-light); font-style: normal; }
   .filter-row { display: grid; grid-template-columns: 1fr 1fr; }
   .favorite-filter { grid-column: 1 / -1; justify-content: center; }
   .resource-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 12px; }
+  .tvbox-toolbar { align-items: stretch; flex-direction: column; }
+  .tvbox-toolbar-actions { justify-content: flex-end; }
+  .tvbox-category-panel { flex-direction: column; }
+  .tvbox-source-card { align-items: stretch; flex-direction: column; gap: 12px; }
+  .tvbox-source-actions { justify-content: flex-end; flex-wrap: wrap; }
+  .tvbox-result-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tvbox-episodes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .tvbox-live-controls { grid-template-columns: 1fr 1fr; }
+  .tvbox-live-controls .search-box { grid-column: 1 / -1; }
+  .tvbox-live-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .resource-typographic { padding: 10px; font-size: 16px; }
   .source-note { grid-template-columns: auto minmax(0, 1fr); }
   .source-links { grid-column: 2; min-width: 0; }
@@ -297,6 +369,13 @@ h1 em { color: var(--accent-light); font-style: normal; }
   .hero-actions button { width: 100%; }
   .resource-stats strong { font-size: 24px; }
   .resource-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tvbox-result-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tvbox-toolbar-actions { display: grid; grid-template-columns: 1fr 1fr; }
+  .tvbox-source-heading { align-items: start; flex-direction: column; }
+  .tvbox-live-controls { grid-template-columns: 1fr; }
+  .tvbox-live-controls .search-box { grid-column: auto; }
+  .tvbox-live-list { grid-template-columns: 1fr; }
+  .tvbox-episodes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .form-grid { grid-template-columns: 1fr; }
   .field-wide { grid-column: auto; }
   .link-row { grid-template-columns: minmax(0, 1fr) auto; }

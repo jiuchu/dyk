@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#151311">
   <title>资源库 · 电影书架</title>
   <link rel="icon" href="../assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="styles.css?v=20261127v">
+  <link rel="stylesheet" href="styles.css?v=20261127w">
 </head>
 <body id="top">
   <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -67,6 +67,7 @@
       <a href="../">电影书架</a>
       <a href="../today/">今日热映</a>
       <a class="is-active" href="./" aria-current="page">资源库</a>
+      <a href="#sources">源中心</a>
       <a href="../#about">片源说明</a>
     </nav>
     <div class="header-note"><span class="status-dot"></span>本地保存 · 随时导入导出</div>
@@ -83,6 +84,7 @@
           <button class="secondary-button" id="import-movies" type="button"><svg class="icon"><use href="#icon-film"></use></svg>导入内置资源</button>
           <button class="secondary-button" id="open-github-import" type="button"><svg class="icon"><use href="#icon-grid"></use></svg>从 GitHub 导入</button>
           <button class="secondary-button" id="open-api-import" type="button"><svg class="icon"><use href="#icon-link"></use></svg>连接 GoComicMosaic</button>
+          <button class="secondary-button" id="open-tvbox-sources" type="button"><svg class="icon"><use href="#icon-grid"></use></svg>打开源中心</button>
         </div>
       </div>
       <div class="resource-stats" aria-label="资源库概况">
@@ -90,6 +92,48 @@
         <div><strong id="stat-favorites">0</strong><span>条收藏</span></div>
         <div><strong id="stat-types">0</strong><span>种类型</span></div>
         <p>资源与链接由你整理；是否可观看、是否需要会员或付费，以原站点当前页面为准。</p>
+      </div>
+    </section>
+
+    <section id="sources" class="tvbox-section" aria-labelledby="tvbox-title">
+      <div class="section-heading">
+        <div>
+          <p class="section-kicker">SOURCE CENTER</p>
+          <h2 id="tvbox-title">源中心</h2>
+          <p class="tvbox-section-intro">导入 TVBox 订阅，聚合搜索影视源，浏览分类与剧集，也可以读取 M3U / TXT 直播源。来源与链接由你自行管理。</p>
+        </div>
+        <div class="data-actions">
+          <button class="text-button" id="tvbox-import-button" type="button"><svg class="icon"><use href="#icon-upload"></use></svg>导入订阅</button>
+          <button class="text-button" id="tvbox-live-button" type="button"><svg class="icon"><use href="#icon-grid"></use></svg>电视直播</button>
+        </div>
+      </div>
+
+      <div class="tvbox-toolbar browser-panel">
+        <label class="search-box" for="tvbox-search-input">
+          <svg class="icon"><use href="#icon-search"></use></svg>
+          <span class="sr-only">全网搜片</span>
+          <input id="tvbox-search-input" type="search" placeholder="输入片名，搜索所有已启用的影视源…" autocomplete="off">
+        </label>
+        <div class="tvbox-toolbar-actions">
+          <button id="tvbox-category-button" class="secondary-button" type="button">浏览分类</button>
+          <button id="tvbox-search-button" class="primary-button" type="button">全网搜片</button>
+        </div>
+      </div>
+
+      <div id="tvbox-category-panel" class="tvbox-category-panel browser-panel" hidden>
+        <label class="select-box"><span class="sr-only">分类来源</span><select id="tvbox-category-site"></select></label>
+        <div id="tvbox-category-chips" class="tvbox-category-chips"></div>
+      </div>
+
+      <div class="tvbox-source-heading">
+        <div><strong>订阅与源</strong><span id="tvbox-source-stats"></span></div>
+        <button id="tvbox-preset-button" class="secondary-button" type="button">添加内置源</button>
+      </div>
+      <div id="tvbox-source-list" class="tvbox-source-list"></div>
+
+      <div id="tvbox-results" class="tvbox-results" hidden>
+        <div class="tvbox-results-heading"><strong>搜索结果</strong><span id="tvbox-search-summary" aria-live="polite"></span></div>
+        <div id="tvbox-search-grid" class="tvbox-search-grid"></div>
       </div>
     </section>
 
@@ -150,11 +194,13 @@
       <div class="source-note-icon"><svg class="icon"><use href="#icon-link"></use></svg></div>
       <div>
         <h2 id="source-note-title">资源有出处，整理有边界</h2>
-        <p>本页是独立的资源管理工具，不复制 GoComicMosaic 源码。可连接其公开资源 API 导入标题、简介、海报与链接；导入前请确认你有权使用对应内容。下载区收录正版平台、公共领域、开放许可及用户上传来源；版权状态、安全性与可用性以原站点为准。GoComicMosaic 仓库未提供 LICENSE，本页仅保留项目名称、来源链接与接口兼容能力。</p>
+        <p>本页是独立的资源管理工具，不复制 GoComicMosaic 源码。可连接其公开资源 API 导入标题、简介、海报与链接。源中心兼容 TVBox Desktop 的订阅格式、苹果 CMS、网页规则、分类详情与 M3U / TXT 直播；Jar / Spider 等桌面端专用源会保留但标记为网页不可用。下载区收录正版平台、公共领域、开放许可及用户上传来源；版权状态、安全性与可用性以原站点为准。GoComicMosaic 仓库未提供 LICENSE，本页仅保留项目名称、来源链接与接口兼容能力。</p>
       </div>
       <div class="source-links">
         <a href="https://github.com/fish2018/GoComicMosaic" target="_blank" rel="noopener noreferrer">GoComicMosaic 项目<svg class="icon"><use href="#icon-arrow"></use></svg></a>
         <a href="https://github.com/fish2018/GoComicMosaic/blob/main/README.md" target="_blank" rel="noopener noreferrer">项目说明<svg class="icon"><use href="#icon-arrow"></use></svg></a>
+        <a href="https://github.com/hgtuj5688/tvbox-desktop" target="_blank" rel="noopener noreferrer">TVBox Desktop<svg class="icon"><use href="#icon-arrow"></use></svg></a>
+        <a href="THIRD_PARTY_NOTICES.txt" target="_blank" rel="noopener noreferrer">第三方许可<svg class="icon"><use href="#icon-arrow"></use></svg></a>
       </div>
     </section>
   </main>
@@ -267,12 +313,73 @@
     </form>
   </dialog>
 
+  <dialog id="tvbox-import-dialog" class="api-dialog" aria-labelledby="tvbox-import-title">
+    <form id="tvbox-import-form" class="dialog-shell api-shell">
+      <button id="tvbox-import-close" class="dialog-close" type="button" aria-label="关闭订阅导入"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <p class="section-kicker">TVBOX SUBSCRIPTION</p>
+      <h2 id="tvbox-import-title">导入 TVBox 订阅</h2>
+      <p>支持远程 JSON 地址、本地 JSON 文件或直接粘贴配置。可识别 sites、lives、parses、flags、headers 等字段；来源类型与地址原样保留。</p>
+      <label class="field"><span>订阅地址</span><input id="tvbox-import-url" type="url" placeholder="https://…/tvbox.json"></label>
+      <label class="field"><span>或选择 JSON 文件</span><input id="tvbox-import-file" type="file" accept="application/json,.json"></label>
+      <label class="field"><span>或粘贴配置</span><textarea id="tvbox-import-text" rows="7" placeholder='{"sites":[…],"lives":[…]}'></textarea></label>
+      <p id="tvbox-import-status" class="api-status" role="status"></p>
+      <div class="dialog-actions editor-actions">
+        <button id="tvbox-import-submit" class="primary-button" type="submit">读取并添加</button>
+        <button id="tvbox-import-cancel" class="secondary-button" type="button">取消</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="tvbox-detail-dialog" class="detail-dialog tvbox-detail-dialog" aria-labelledby="tvbox-detail-title">
+    <div class="dialog-shell">
+      <button id="tvbox-detail-close" class="dialog-close" type="button" aria-label="关闭源详情"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <div class="detail-poster"><img id="tvbox-detail-poster" src="" alt="" referrerpolicy="no-referrer" hidden><div id="tvbox-detail-typographic" class="detail-typographic"></div></div>
+      <div class="detail-info">
+        <p id="tvbox-detail-source" class="detail-source"></p>
+        <h2 id="tvbox-detail-title"></h2>
+        <p id="tvbox-detail-meta" class="detail-meta"></p>
+        <p id="tvbox-detail-description" class="detail-description"></p>
+        <section class="detail-links-section">
+          <h3>播放线路</h3>
+          <div id="tvbox-detail-lines" class="tvbox-line-tabs"></div>
+          <div id="tvbox-detail-episodes" class="tvbox-episodes"></div>
+        </section>
+        <section class="detail-links-section">
+          <h3>播放器</h3>
+          <video id="tvbox-detail-video" class="tvbox-video" controls playsinline preload="none" hidden></video>
+          <p id="tvbox-player-status" class="detail-empty-links"></p>
+        </section>
+        <div class="dialog-actions detail-actions">
+          <button id="tvbox-detail-save" class="primary-button" type="button">保存到资源库</button>
+          <button id="tvbox-detail-open" class="secondary-button" type="button">打开原地址</button>
+        </div>
+        <p class="detail-note">播放能力取决于原源与浏览器支持；打不开时可复制地址到外部播放器。</p>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog id="tvbox-live-dialog" class="detail-dialog tvbox-live-dialog" aria-labelledby="tvbox-live-title">
+    <div class="dialog-shell tvbox-live-shell">
+      <button id="tvbox-live-close" class="dialog-close" type="button" aria-label="关闭电视直播"><svg class="icon"><use href="#icon-close"></use></svg></button>
+      <div class="tvbox-live-heading"><p class="section-kicker">LIVE TV</p><h2 id="tvbox-live-title">电视直播</h2><p id="tvbox-live-status"></p></div>
+      <video id="tvbox-live-video" class="tvbox-video" controls playsinline preload="none" hidden></video>
+      <p id="tvbox-live-player-status" class="detail-empty-links"></p>
+      <div class="tvbox-live-controls">
+        <label class="select-box"><span class="sr-only">直播源</span><select id="tvbox-live-source"></select></label>
+        <label class="select-box"><span class="sr-only">频道分组</span><select id="tvbox-live-group"></select></label>
+        <label class="search-box"><span class="sr-only">搜索频道</span><input id="tvbox-live-search" type="search" placeholder="搜索频道…"></label>
+      </div>
+      <div id="tvbox-live-list" class="tvbox-live-list"></div>
+    </div>
+  </dialog>
+
   <input id="json-file" type="file" accept="application/json,.json" hidden>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
   <script src="../data.js"></script>
   <script src="../classics.js"></script>
   <script src="../showing.js"></script>
-  <script src="app.js?v=20261127v"></script>
+  <script src="tvbox.js?v=20261127w"></script>
+  <script src="app.js?v=20261127w"></script>
 </body>
 </html>
