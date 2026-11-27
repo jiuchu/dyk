@@ -793,18 +793,18 @@
     elements.detailImage.alt = hasPoster ? `《${resource.title}》海报` : "";
     if (hasPoster) {
       const fullSrc = resource.poster;
+      const thumbSrc = posterThumb(fullSrc);
       elements.detailImage.dataset.fullSrc = fullSrc;
-      const upgrade = () => {
-        const target = new URL(elements.detailImage.dataset.fullSrc, location.href).href;
-        const current = new URL(elements.detailImage.currentSrc || elements.detailImage.src, location.href).href;
-        if (current !== target) elements.detailImage.src = target;
-      };
-      elements.detailImage.onload = upgrade;
-      elements.detailImage.onerror = upgrade;
-      elements.detailImage.src = posterThumb(fullSrc);
+      elements.detailImage.src = thumbSrc;
+      if (thumbSrc !== fullSrc) {
+        const preload = new Image();
+        preload.decoding = "async";
+        preload.onload = () => {
+          if (activeId === id && elements.detail.open) elements.detailImage.src = fullSrc;
+        };
+        preload.src = fullSrc;
+      }
     } else {
-      elements.detailImage.onload = null;
-      elements.detailImage.onerror = null;
       elements.detailImage.removeAttribute("data-full-src");
       elements.detailImage.removeAttribute("src");
     }
@@ -1297,7 +1297,7 @@
 
   function loadExtraCatalog() {
     window.EXTRA_RESOURCES = [];
-    const version = "20261127p";
+    const version = "20261127q";
     let catalogErrorShown = false;
     let nextIndex = 0;
     const scheduleRefresh = () => {
