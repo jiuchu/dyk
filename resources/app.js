@@ -1420,7 +1420,12 @@
     return new Promise((resolve) => {
       const before = window.EXTRA_RESOURCES.length;
       const script = document.createElement("script");
-      script.src = `catalog-${index}.js?v=20261127z${attempt ? `&retry=${attempt}` : ""}`;
+      const sources = [
+        `catalog-${index}.js?v=20261127z`,
+        `https://cdn.jsdelivr.net/gh/jiuchu/dyk@e93b96033a7a01dbb6578a1aa4d74eb60526f5f6/resources/catalog-${index}.js`,
+        `https://fastly.jsdelivr.net/gh/jiuchu/dyk@e93b96033a7a01dbb6578a1aa4d74eb60526f5f6/resources/catalog-${index}.js`
+      ];
+      script.src = sources[attempt];
       let settled = false;
       let handedOff = false;
       let retryTimer = 0;
