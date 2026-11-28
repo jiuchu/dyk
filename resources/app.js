@@ -1448,7 +1448,7 @@
         script.remove();
         if (!handedOff) retry();
       };
-      if (attempt < 2) retryTimer = window.setTimeout(retry, 45000);
+      if (attempt < 2) retryTimer = window.setTimeout(retry, 12000);
       script.onload = () => {
         if (settled) return;
         if (window.EXTRA_RESOURCES.length === before) fail();
@@ -1461,17 +1461,23 @@
 
   function loadNextCatalog() {
     if (nextCatalogIndex >= 8) return Promise.resolve();
-    if (catalogTask) return catalogTask;
-    const index = nextCatalogIndex++;
-    catalogTask = loadCatalogChunk(index).finally(() => {
-      catalogTask = null;
-    });
-    return catalogTask;
+    return loadCatalogChunk(nextCatalogIndex++);
   }
 
   async function loadExtraCatalog() {
     if (!Array.isArray(window.EXTRA_RESOURCES)) window.EXTRA_RESOURCES = [];
-    while (nextCatalogIndex < 8) await loadNextCatalog();
-    refreshExtraCatalog();
+    if (nextCatalogIndex >= 8) return;
+    if (!catalogTask) {
+      catalogTask = (async () => {
+        async function worker() {
+          while (nextCatalogIndex < 8) await loadNextCatalog();
+        }
+        await Promise.all(Array.from({ length: 4 }, worker));
+        refreshExtraCatalog();
+      })().finally(() => {
+        catalogTask = null;
+      });
+    }
+    await catalogTask;
   }
 })();
