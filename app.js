@@ -9,17 +9,13 @@
   const detailCacheKey = "dyk-detail-cache-v2";
   const detailCache = new Map();
   const detailRequests = new Map();
-  const posterQueue = [];
-  let activePosterLoads = 0;
-  const maxPosterLoads = 4;
   const posterObserver = "IntersectionObserver" in window
     ? new IntersectionObserver((entries, observer) => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
-          posterQueue.push(entry.target);
+          loadPoster(entry.target);
           observer.unobserve(entry.target);
         }
-        loadNextPosters();
       }, { rootMargin: "200px 0px" })
     : null;
   try {
@@ -292,33 +288,17 @@
     return `assets/posters/thumbs/${filename}.webp`;
   }
 
-  function loadNextPosters() {
-    if (activeMovieId !== null) return;
-    while (activePosterLoads < maxPosterLoads && posterQueue.length) {
-      const image = posterQueue.shift();
-      if (!image.isConnected || !image.dataset.src) continue;
-      const source = image.dataset.src;
-      image.removeAttribute("data-src");
-      activePosterLoads++;
-      image.addEventListener("load", () => {
-        activePosterLoads--;
-        loadNextPosters();
-      }, { once: true });
-      image.addEventListener("error", () => {
-        activePosterLoads--;
-        loadNextPosters();
-      }, { once: true });
-      image.src = source;
-    }
+  function loadPoster(image) {
+    if (!image.isConnected || !image.dataset.src) return;
+    const source = image.dataset.src;
+    image.removeAttribute("data-src");
+    image.src = source;
   }
 
   function observePosterImages() {
     document.querySelectorAll(".case-cover img[data-src]").forEach((image) => {
       if (posterObserver) posterObserver.observe(image);
-      else {
-        image.src = image.dataset.src;
-        image.removeAttribute("data-src");
-      }
+      else loadPoster(image);
     });
   }
 
@@ -335,7 +315,7 @@
           aria-label="查看《${title}》的大图与剧情简介">
           <span class="case-spine"><b>${escapeHtml(movie.source)}</b> · ${escapeHtml(movie.category)}${year ? ` · ${year}` : ""}</span>
           ${hasPoster
-            ? `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="${escapeHtml(thumbnailFor(movie.poster))}" alt="《${title}》封面" decoding="async">`
+            ? `<img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-src="${escapeHtml(thumbnailFor(movie.poster))}" alt="《${title}》封面" loading="lazy" decoding="async">`
             : typographicCover(movie)}
           <span class="source-badge">${escapeHtml(movie.collection === "classic" ? "豆瓣 Top250" : movie.collection === "showing" ? "豆瓣热映" : movie.source)}</span>
           ${movie.featured && movie.collection === "free" ? '<span class="hot-badge">热门</span>' : ""}
@@ -665,7 +645,6 @@
   function closeDialog() {
     if (elements.dialog.open) elements.dialog.close();
     activeMovieId = null;
-    loadNextPosters();
   }
 
   function updateDialogFavorite() {
@@ -934,7 +913,6 @@
   elements.dialog.addEventListener("close", () => {
     document.body.classList.remove("modal-open");
     activeMovieId = null;
-    loadNextPosters();
     if (lastDialogTrigger && document.contains(lastDialogTrigger)) {
       lastDialogTrigger.focus({ preventScroll: true });
     }
