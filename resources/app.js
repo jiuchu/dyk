@@ -624,6 +624,7 @@
     renderStats();
     const list = filteredResources();
     const visible = list.slice(0, state.limit);
+    const eagerCount = window.innerWidth <= 480 ? 6 : window.innerWidth <= 760 ? 9 : window.innerWidth <= 1100 ? 10 : 12;
     elements.summary.textContent = `显示 ${visible.length} / ${resources.length} 条资源`;
     elements.clearSearch.hidden = !state.query;
     elements.reset.hidden = !state.query && state.type === "all" && state.source === "all" && !state.favoritesOnly;
@@ -631,7 +632,7 @@
     elements.grid.innerHTML = visible.map((resource, index) => {
       const hasPoster = Boolean(resource.poster);
       const poster = posterThumb(resource.poster);
-      const eager = index < 6;
+      const eager = index < eagerCount;
       return `<article class="resource-card">
         <button class="resource-case" type="button" data-open="${escapeHtml(resource.id)}" aria-label="查看《${escapeHtml(resource.title)}》详情">
           <div class="resource-cover">
