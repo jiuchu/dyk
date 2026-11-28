@@ -2,7 +2,7 @@
   "use strict";
 
   const storageKey = "dyk-resource-library-v1";
-  const pageSize = 48;
+  const pageSize = 24;
   const catalogMigrationKey = "dyk-resource-library-catalog-v6";
   const doubanCacheKey = "dyk-resource-douban-v1";
   const apiDefault = "https://dm.xueximeng.com/api/resources/public";
@@ -23,7 +23,8 @@
     limit: pageSize
   };
   let renderKey = "";
-  let extraCatalogLoading = true;
+  let nextCatalogIndex = 0;
+  let catalogTask = null;
   const doubanRequests = new Set();
   let doubanCache = {};
   try {
@@ -623,7 +624,7 @@
     renderStats();
     const list = filteredResources();
     const visible = list.slice(0, state.limit);
-    elements.summary.textContent = `显示 ${visible.length} / ${resources.length} 条资源${extraCatalogLoading ? " · 正在加载扩展资源…" : ""}`;
+    elements.summary.textContent = `显示 ${visible.length} / ${resources.length} 条资源`;
     elements.clearSearch.hidden = !state.query;
     elements.reset.hidden = !state.query && state.type === "all" && state.source === "all" && !state.favoritesOnly;
     elements.favoriteFilter.setAttribute("aria-pressed", String(state.favoritesOnly));
@@ -1240,7 +1241,8 @@
     }
   }
 
-  function exportJson() {
+  async function exportJson() {
+    await loadExtraCatalog();
     const payload = {
       format: "dyk-resource-library",
       version: 1,
@@ -1270,6 +1272,7 @@
   }
 
   elements.search.addEventListener("input", () => {
+    loadExtraCatalog();
     state.query = elements.search.value;
     render();
   });
@@ -1279,25 +1282,33 @@
     elements.search.focus();
     render();
   });
+  elements.typeFilter.addEventListener("focus", loadExtraCatalog);
+  elements.sourceFilter.addEventListener("focus", loadExtraCatalog);
   elements.typeFilter.addEventListener("change", () => {
+    loadExtraCatalog();
     state.type = elements.typeFilter.value;
     render();
   });
   elements.sourceFilter.addEventListener("change", () => {
+    loadExtraCatalog();
     state.source = elements.sourceFilter.value;
     render();
   });
   elements.sort.addEventListener("change", () => {
+    loadExtraCatalog();
     state.sort = elements.sort.value;
     render();
   });
   elements.favoriteFilter.addEventListener("click", () => {
+    loadExtraCatalog();
     state.favoritesOnly = !state.favoritesOnly;
     render();
   });
   elements.reset.addEventListener("click", resetFilters);
-  elements.loadMore.addEventListener("click", () => {
-    state.limit += pageSize;
+  elements.loadMore.addEventListener("click", async () => {
+    const expandCatalog = state.limit + pageSize * 3 >= filteredResources().length && nextCatalogIndex < 8;
+    if (expandCatalog) await loadExtraCatalog();
+    state.limit += expandCatalog ? pageSize * 4 : pageSize;
     render();
   });
   document.getElementById("add-resource").addEventListener("click", () => openEditor());
@@ -1405,15 +1416,11 @@
     render();
   }
 
-  function loadExtraCatalog() {
-    window.EXTRA_RESOURCES = [];
-    const version = "20261127z";
-    let catalogErrorShown = false;
-    let nextIndex = 0;
-    const loadChunk = (index, attempt = 0) => new Promise((resolve) => {
+  function loadCatalogChunk(index, attempt = 0) {
+    return new Promise((resolve) => {
       const before = window.EXTRA_RESOURCES.length;
       const script = document.createElement("script");
-      script.src = `catalog-${index}.js?v=${version}${attempt ? `&retry=${attempt}` : ""}`;
+      script.src = `catalog-${index}.js?v=20261127z${attempt ? `&retry=${attempt}` : ""}`;
       let settled = false;
       let handedOff = false;
       let retryTimer = 0;
@@ -1427,10 +1434,10 @@
         if (settled || handedOff) return;
         if (attempt < 2) {
           handedOff = true;
-          loadChunk(index, attempt + 1).then(finish);
+          loadCatalogChunk(index, attempt + 1).then(finish);
         } else {
-          if (!catalogErrorShown) {
-            catalogErrorShown = true;
+          if (!window.__dykCatalogErrorShown) {
+            window.__dykCatalogErrorShown = true;
             showToast("部分资源加载失败，请刷新页面重试。", true);
           }
           finish();
@@ -1450,20 +1457,21 @@
       script.onerror = fail;
       document.head.appendChild(script);
     });
-    const worker = async () => {
-      while (nextIndex < 8) {
-        const index = nextIndex;
-        nextIndex += 1;
-        await loadChunk(index);
-      }
-    };
-    Promise.all(Array.from({ length: 4 }, worker)).then(() => {
-      extraCatalogLoading = false;
-      refreshExtraCatalog();
-    });
   }
 
-  window.requestAnimationFrame(() => {
-    window.setTimeout(loadExtraCatalog, 0);
-  });
+  function loadNextCatalog() {
+    if (nextCatalogIndex >= 8) return Promise.resolve();
+    if (catalogTask) return catalogTask;
+    const index = nextCatalogIndex++;
+    catalogTask = loadCatalogChunk(index).finally(() => {
+      catalogTask = null;
+    });
+    return catalogTask;
+  }
+
+  async function loadExtraCatalog() {
+    if (!Array.isArray(window.EXTRA_RESOURCES)) window.EXTRA_RESOURCES = [];
+    while (nextCatalogIndex < 8) await loadNextCatalog();
+    refreshExtraCatalog();
+  }
 })();
